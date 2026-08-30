@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SecureStorageService } from '../../services/storage/secure-storage.service.js';
+import { SecureStorageService } from '../../services/storage/secure-storage.service';
 
 describe('SecureStorageService Unit Tests', () => {
   let storage: SecureStorageService;

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { socketManager } from '../../services/socket/socket.manager.js';
-import { useSocketStore } from '../../store/socket.store.js';
+import { socketManager } from '../../services/socket/socket.manager';
+import { useSocketStore } from '../../store/socket.store';
 
 describe('SocketManager Unit Tests', () => {
   beforeEach(() => {

@@ -9,12 +9,12 @@ import {
   type ListRenderItemInfo,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useConversations } from '../../src/features/chat/hooks/useConversations.js';
-import { ConversationItem } from '../../src/features/chat/components/ConversationItem.js';
-import { ConnectionBanner } from '../../src/components/ConnectionBanner.js';
-import { EmptyState } from '../../src/components/EmptyState.js';
-import { LoadingSpinner } from '../../src/components/LoadingSpinner.js';
-import type { ConversationItemData } from '../../src/types/chat.types.js';
+import { useConversations } from '../../src/features/chat/hooks/useConversations';
+import { ConversationItem } from '../../src/features/chat/components/ConversationItem';
+import { ConnectionBanner } from '../../src/components/ConnectionBanner';
+import { EmptyState } from '../../src/components/EmptyState';
+import { LoadingSpinner } from '../../src/components/LoadingSpinner';
+import type { ConversationItemData } from '../../src/types/chat.types';
 
 export default function ConversationListScreen(): React.JSX.Element {
   const router = useRouter();

@@ -7,7 +7,7 @@ import {
   type MessageAckResponse,
   type IMessage,
 } from '@chatlock/shared-types';
-import { mobileConfig } from '../config/env.js';
+import { mobileConfig } from '../config/env';
 
 export type TypedClientSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 

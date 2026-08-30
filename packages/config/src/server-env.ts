@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import dotenv from 'dotenv';
 import { ENVIRONMENTS, LOG_LEVELS, STORAGE_DRIVERS } from './constants.js';
 
 // Raw environment variables schema
@@ -308,18 +307,12 @@ export function parseAndValidateServerEnv(
   };
 }
 
-export function loadServerConfig(envPath?: string): ServerConfig {
+export function loadServerConfig(envSource: Record<string, string | undefined> = process.env): ServerConfig {
   if (cachedServerConfig) {
     return cachedServerConfig;
   }
 
-  if (envPath) {
-    dotenv.config({ path: envPath });
-  } else {
-    dotenv.config();
-  }
-
-  cachedServerConfig = parseAndValidateServerEnv(process.env);
+  cachedServerConfig = parseAndValidateServerEnv(envSource);
   return cachedServerConfig;
 }
 

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { conversationApi } from '../../../services/api/conversation.api.js';
-import { socketManager } from '../../../services/socket/socket.manager.js';
-import { useAuthStore } from '../../../store/auth.store.js';
+import { conversationApi } from '../../../services/api/conversation.api';
+import { socketManager } from '../../../services/socket/socket.manager';
+import { useAuthStore } from '../../../store/auth.store';
 import type { IMessage, UserProfile } from '@chatlock/shared-types';
-import type { ConversationItemData } from '../../../types/chat.types.js';
+import type { ConversationItemData } from '../../../types/chat.types';
 
 export const CONVERSATIONS_QUERY_KEY = ['conversations'];
 

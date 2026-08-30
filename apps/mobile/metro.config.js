@@ -15,4 +15,9 @@ config.resolver.nodeModulesPaths = [
   path.resolve(monorepoRoot, 'node_modules'),
 ];
 
+// 3. Ensure standard source extensions
+config.resolver.sourceExts = [
+  ...new Set([...config.resolver.sourceExts, 'ts', 'tsx', 'js', 'jsx', 'json', 'cjs', 'mjs']),
+];
+
 module.exports = config;

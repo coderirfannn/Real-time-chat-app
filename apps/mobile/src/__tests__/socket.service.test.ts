@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SocketService } from '../services/socket.service.js';
+import { SocketService } from '../services/socket.service';
 
 vi.mock('expo-constants', () => ({
   default: {

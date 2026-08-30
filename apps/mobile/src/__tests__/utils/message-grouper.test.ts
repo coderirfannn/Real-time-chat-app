@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildInvertedChatFeed } from '../../utils/message-grouper.js';
-import type { LocalMessage, ChatMessageItem } from '../../types/chat.types.js';
+import { buildInvertedChatFeed } from '../../utils/message-grouper';
+import type { LocalMessage, ChatMessageItem } from '../../types/chat.types';
 
 describe('Message Grouper Unit Tests', () => {
   const currentUserId = 'user-current';

@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { conversationApi } from '../../../services/api/conversation.api.js';
-import { socketManager } from '../../../services/socket/socket.manager.js';
-import { useAuthStore } from '../../../store/auth.store.js';
-import { buildInvertedChatFeed } from '../../../utils/message-grouper.js';
-import type { LocalMessage, ChatFeedItem } from '../../../types/chat.types.js';
+import { conversationApi } from '../../../services/api/conversation.api';
+import { socketManager } from '../../../services/socket/socket.manager';
+import { useAuthStore } from '../../../store/auth.store';
+import { buildInvertedChatFeed } from '../../../utils/message-grouper';
+import type { LocalMessage, ChatFeedItem } from '../../../types/chat.types';
 import type { IMessage, MessageAckResponse, UserProfile } from '@chatlock/shared-types';
 
 export interface UseChatReturn {

@@ -1,4 +1,4 @@
-import type { IStorageService } from './storage.interface.js';
+import type { IStorageService } from './storage.interface';
 
 export class AppStorageService implements IStorageService {
   private memoryMap: Map<string, string> = new Map();

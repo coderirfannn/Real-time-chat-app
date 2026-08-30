@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { appStorage } from '../services/storage/app-storage.service.js';
+import { appStorage } from '../services/storage/app-storage.service';
 
 export type AppTheme = 'light' | 'dark' | 'system';
 

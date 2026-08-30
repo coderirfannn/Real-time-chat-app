@@ -9,12 +9,12 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useChat } from '../../../src/features/chat/hooks/useChat.js';
-import { MessageList } from '../../../src/features/chat/components/MessageList.js';
-import { MessageComposer } from '../../../src/features/chat/components/MessageComposer.js';
-import { Avatar } from '../../../src/components/Avatar.js';
-import { ConnectionBanner } from '../../../src/components/ConnectionBanner.js';
-import { LoadingSpinner } from '../../../src/components/LoadingSpinner.js';
+import { useChat } from '../../../src/features/chat/hooks/useChat';
+import { MessageList } from '../../../src/features/chat/components/MessageList';
+import { MessageComposer } from '../../../src/features/chat/components/MessageComposer';
+import { Avatar } from '../../../src/components/Avatar';
+import { ConnectionBanner } from '../../../src/components/ConnectionBanner';
+import { LoadingSpinner } from '../../../src/components/LoadingSpinner';
 
 export default function ChatScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();

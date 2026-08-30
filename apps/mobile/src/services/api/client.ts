@@ -1,5 +1,5 @@
-import { mobileConfig } from '../../config/env.js';
-import { secureStorage } from '../storage/secure-storage.service.js';
+import { mobileConfig } from '../../config/env';
+import { secureStorage } from '../storage/secure-storage.service';
 
 export interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;

@@ -3,8 +3,8 @@ import type {
   ChatFeedItem,
   ChatMessageItem,
   DateSeparatorItem,
-} from '../types/chat.types.js';
-import { formatDateSeparator } from './date-formatter.js';
+} from '../types/chat.types';
+import { formatDateSeparator } from './date-formatter';
 
 const CONSECUTIVE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 

@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { formatMessageTime } from '../../../utils/date-formatter.js';
-import type { LocalMessage, DeliveryStatus } from '../../../types/chat.types.js';
+import { formatMessageTime } from '../../../utils/date-formatter';
+import type { LocalMessage, DeliveryStatus } from '../../../types/chat.types';
 
 export interface MessageBubbleProps {
   message: LocalMessage;

@@ -1,9 +1,9 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Avatar } from '../../../components/Avatar.js';
-import { Badge } from '../../../components/Badge.js';
-import { formatConversationTime } from '../../../utils/date-formatter.js';
-import type { ConversationItemData } from '../../../types/chat.types.js';
+import { Avatar } from '../../../components/Avatar';
+import { Badge } from '../../../components/Badge';
+import { formatConversationTime } from '../../../utils/date-formatter';
+import type { ConversationItemData } from '../../../types/chat.types';
 
 export interface ConversationItemProps {
   item: ConversationItemData;

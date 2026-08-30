@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import type { IStorageService } from './storage.interface.js';
+import type { IStorageService } from './storage.interface';
 
 export class SecureStorageService implements IStorageService {
   private memoryFallback: Map<string, string> = new Map();

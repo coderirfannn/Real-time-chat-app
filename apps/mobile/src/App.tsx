@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View, StatusBar, SafeAreaView } from 'react-native';
-import { mobileConfig } from './config/env.js';
+import { mobileConfig } from './config/env';
 
 export default function App(): React.JSX.Element {
   return (

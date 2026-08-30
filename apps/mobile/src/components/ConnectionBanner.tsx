@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { useSocketStore } from '../store/socket.store.js';
-import { useAppStore } from '../store/app.store.js';
+import { useSocketStore } from '../store/socket.store';
+import { useAppStore } from '../store/app.store';
 
 export function ConnectionBanner(): React.JSX.Element | null {
   const connectionState = useSocketStore((state) => state.connectionState);

@@ -1,3 +1,3 @@
-export * from './api/index.js';
-export * from './socket/index.js';
-export * from './storage/index.js';
+export * from './api/index';
+export * from './socket/index';
+export * from './storage/index';

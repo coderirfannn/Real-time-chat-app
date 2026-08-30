@@ -1,10 +1,10 @@
 import React, { useCallback, memo } from 'react';
 import { FlatList, View, StyleSheet, type ListRenderItemInfo } from 'react-native';
-import { MessageBubble } from './MessageBubble.js';
-import { DateSeparator } from '../../../components/DateSeparator.js';
-import { TypingIndicator } from './TypingIndicator.js';
-import { LoadingSpinner } from '../../../components/LoadingSpinner.js';
-import type { ChatFeedItem } from '../../../types/chat.types.js';
+import { MessageBubble } from './MessageBubble';
+import { DateSeparator } from '../../../components/DateSeparator';
+import { TypingIndicator } from './TypingIndicator';
+import { LoadingSpinner } from '../../../components/LoadingSpinner';
+import type { ChatFeedItem } from '../../../types/chat.types';
 
 export interface MessageListProps {
   items: ChatFeedItem[];

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { AuthResponse, UserProfile } from '@chatlock/shared-types';
-import { useAuthStore } from '../../store/auth.store.js';
-import { secureStorage } from '../../services/storage/secure-storage.service.js';
+import { useAuthStore } from '../../store/auth.store';
+import { secureStorage } from '../../services/storage/secure-storage.service';
 
 describe('useAuthStore Unit Tests', () => {
   const originalFetch = global.fetch;

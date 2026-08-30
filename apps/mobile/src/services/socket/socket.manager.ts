@@ -1,5 +1,5 @@
-import { socketService, type TypedClientSocket } from '../socket.service.js';
-import { useSocketStore } from '../../store/socket.store.js';
+import { socketService, type TypedClientSocket } from '../socket.service';
+import { useSocketStore } from '../../store/socket.store';
 import {
   type SendMessagePayload,
   type MessageAckResponse,

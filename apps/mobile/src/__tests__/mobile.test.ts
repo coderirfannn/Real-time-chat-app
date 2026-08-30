@@ -14,7 +14,7 @@ vi.mock('expo-constants', () => ({
 
 describe('Mobile App Foundation', () => {
   it('loads valid mobile configuration', async () => {
-    const { mobileConfig } = await import('../config/env.js');
+    const { mobileConfig } = await import('../config/env');
     expect(mobileConfig).toBeDefined();
     expect(mobileConfig.apiUrl).toBe('http://localhost:5000/api/v1');
     expect(mobileConfig.socketUrl).toBe('http://localhost:5000');

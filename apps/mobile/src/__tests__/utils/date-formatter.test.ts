@@ -3,7 +3,7 @@ import {
   formatMessageTime,
   formatConversationTime,
   formatDateSeparator,
-} from '../../utils/date-formatter.js';
+} from '../../utils/date-formatter';
 
 describe('Date Formatter Utilities Unit Tests', () => {
   it('formats message timestamp correctly', () => {

@@ -1,2 +1,2 @@
-export * from './useConversations.js';
-export * from './useChat.js';
+export * from './useConversations';
+export * from './useChat';

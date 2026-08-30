@@ -1,2 +1,2 @@
-export * from './socket.manager.js';
-export * from '../socket.service.js';
+export * from './socket.manager';
+export * from '../socket.service';

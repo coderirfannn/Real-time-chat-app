@@ -1,2 +1,2 @@
-export * from './date-formatter.js';
-export * from './message-grouper.js';
+export * from './date-formatter';
+export * from './message-grouper';

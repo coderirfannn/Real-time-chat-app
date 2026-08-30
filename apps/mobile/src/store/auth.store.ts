@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { UserProfile, AuthResponse } from '@chatlock/shared-types';
-import { secureStorage } from '../services/storage/secure-storage.service.js';
-import { authApi } from '../services/api/auth.api.js';
+import { secureStorage } from '../services/storage/secure-storage.service';
+import { authApi } from '../services/api/auth.api';
 
 export interface AuthState {
   user: UserProfile | null;

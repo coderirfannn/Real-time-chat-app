@@ -1,4 +1,4 @@
-import { apiClient } from './client.js';
+import { apiClient } from './client';
 import type { LoginInput, RegisterInput, RefreshTokenInput } from '@chatlock/validation';
 import type { AuthResponse, UserProfile } from '@chatlock/shared-types';
 

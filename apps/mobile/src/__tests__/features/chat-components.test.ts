@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
-import { Avatar } from '../../components/Avatar.js';
-import { Badge } from '../../components/Badge.js';
-import { DateSeparator } from '../../components/DateSeparator.js';
-import { MessageBubble } from '../../features/chat/components/MessageBubble.js';
-import type { LocalMessage } from '../../types/chat.types.js';
+import { Avatar } from '../../components/Avatar';
+import { Badge } from '../../components/Badge';
+import { DateSeparator } from '../../components/DateSeparator';
+import { MessageBubble } from '../../features/chat/components/MessageBubble';
+import type { LocalMessage } from '../../types/chat.types';
 
 describe('Chat UI Components Unit Tests', () => {
   it('instantiates Avatar component without crashing', () => {

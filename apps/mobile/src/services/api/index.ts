@@ -1,3 +1,3 @@
-export * from './client.js';
-export * from './auth.api.js';
-export * from './conversation.api.js';
+export * from './client';
+export * from './auth.api';
+export * from './conversation.api';

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ApiClient, ApiError } from '../../services/api/client.js';
-import { secureStorage } from '../../services/storage/secure-storage.service.js';
+import { ApiClient, ApiError } from '../../services/api/client';
+import { secureStorage } from '../../services/storage/secure-storage.service';
 
 describe('ApiClient Unit Tests', () => {
   let client: ApiClient;
