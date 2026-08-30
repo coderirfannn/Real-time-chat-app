@@ -26,7 +26,7 @@ describe('Validation Schemas', () => {
 
   it('validates message payload', () => {
     const message = {
-      conversationId: 'conv-123',
+      conversationId: '507f1f77bcf86cd799439011',
       content: 'Hello World',
       type: 'text' as const,
     };

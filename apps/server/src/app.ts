@@ -1,47 +1,38 @@
-import express, { type Express, type Request, type Response, type NextFunction } from 'express';
-import helmet from 'helmet';
-import cors from 'cors';
-import morgan from 'morgan';
-import type { ApiResponse, HealthStatus, ApiError } from '@chatlock/shared-types';
+import express, { type Express, type Request, type Response } from 'express';
+import { requestIdMiddleware } from './middleware/request-id.middleware.js';
+import { loggingMiddleware } from './middleware/logging.middleware.js';
+import { createSecurityMiddlewares } from './middleware/security.middleware.js';
+import { notFoundMiddleware } from './middleware/not-found.middleware.js';
+import { errorHandler } from './middleware/error.middleware.js';
+import { createApiRouter } from './routes/index.js';
 import { config } from './config/index.js';
+import type { ApiResponse } from '@chatlock/shared-types';
 
 export function createApp(): Express {
   const app = express();
 
-  // Security Middleware
-  if (config.security.helmetEnabled) {
-    app.use(helmet());
+  // 1. Request ID attribution
+  app.use(requestIdMiddleware);
+
+  // 2. HTTP access logging
+  app.use(loggingMiddleware);
+
+  // 3. Security, CORS, and body parsing
+  const securityMiddlewares = createSecurityMiddlewares();
+  for (const middleware of securityMiddlewares) {
+    app.use(middleware);
   }
 
-  // CORS Configuration
-  app.use(
-    cors({
-      origin: config.app.corsOrigins.includes('*') ? '*' : config.app.corsOrigins,
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    }),
-  );
-
-  // Request Parsing
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-  // Request Logging
-  if (config.app.env !== 'test') {
-    app.use(morgan(config.logging.pretty ? 'dev' : 'combined'));
-  }
-
-  // Root endpoint
+  // 4. Root information endpoint
   app.get(
     '/',
     (
       _req: Request,
       res: Response<ApiResponse<{ name: string; version: string; docs: string }>>,
     ) => {
-      res.json({
+      res.status(200).json({
         success: true,
-        message: `${config.app.appName} API is running`,
+        message: `${config.app.appName} API is active`,
         data: {
           name: config.app.appName,
           version: '0.1.0',
@@ -52,50 +43,14 @@ export function createApp(): Express {
     },
   );
 
-  // Health check handler
-  const handleHealth = (_req: Request, res: Response<ApiResponse<HealthStatus>>) => {
-    res.status(200).json({
-      success: true,
-      message: 'Service is healthy',
-      data: {
-        status: 'ok',
-        version: '0.1.0',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        environment: config.app.env,
-      },
-      timestamp: new Date().toISOString(),
-    });
-  };
+  // 5. API Routes (/health, /api/v1/*)
+  app.use(createApiRouter());
 
-  // Base and API-prefixed health routes
-  app.get('/health', handleHealth);
-  app.get(`${config.app.apiPrefix}/health`, handleHealth);
+  // 6. 404 Route Handler
+  app.use(notFoundMiddleware);
 
-  // 404 Route Handler
-  app.use((req: Request, res: Response<ApiError>) => {
-    res.status(404).json({
-      success: false,
-      statusCode: 404,
-      error: 'Not Found',
-      message: `Cannot ${req.method} ${req.originalUrl}`,
-      timestamp: new Date().toISOString(),
-    });
-  });
-
-  // Centralized Error Handler
-  app.use((err: Error, _req: Request, res: Response<ApiError>, _next: NextFunction) => {
-    // eslint-disable-next-line no-console
-    console.error('[Unhandled Server Error]', err);
-
-    res.status(500).json({
-      success: false,
-      statusCode: 500,
-      error: 'Internal Server Error',
-      message: config.app.isProduction ? 'An unexpected error occurred' : err.message,
-      timestamp: new Date().toISOString(),
-    });
-  });
+  // 7. Centralized Error Handler
+  app.use(errorHandler);
 
   return app;
 }

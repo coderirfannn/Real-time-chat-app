@@ -27,6 +27,7 @@ export interface IMessage extends Timestamps {
   id: ID;
   conversationId: ID;
   senderId: ID;
+  clientMessageId: string;
   sender?: UserProfile;
   type: MessageType;
   content: string;
@@ -34,6 +35,8 @@ export interface IMessage extends Timestamps {
   status: MessageDeliveryStatus;
   reactions?: MessageReaction[];
   replyToMessageId?: ID;
+  editedAt?: string | null;
+  deletedAt?: string | null;
   isEdited: boolean;
   isDeleted: boolean;
 }
@@ -43,9 +46,13 @@ export interface IConversation extends Timestamps {
   type: ConversationType;
   title?: string;
   avatarUrl?: string;
-  creatorId: ID;
+  creatorId?: ID;
   participants: ID[];
+  admins?: ID[];
+  lastMessageId?: ID;
   lastMessage?: IMessage;
+  lastMessageAt?: string;
   unreadCount?: number;
   isArchived?: boolean;
+  directKey?: string;
 }

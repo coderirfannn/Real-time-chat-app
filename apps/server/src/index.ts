@@ -1,30 +1,59 @@
 import { startServer } from './server.js';
+import { logger } from './utils/logger.js';
 import { config } from './config/index.js';
+
+const appLogger = logger.child('Bootstrap');
 
 async function bootstrap(): Promise<void> {
   try {
-    const running = await startServer(config.app.port);
+    const running = await startServer({
+      port: config.app.port,
+      connectDatabase: true,
+      connectRedis: true,
+    });
 
-    const shutdown = async (signal: string) => {
-      // eslint-disable-next-line no-console
-      console.info(`\nReceived ${signal}. Shutting down gracefully...`);
+    let isShuttingDown = false;
+
+    const handleShutdown = async (signal: string) => {
+      if (isShuttingDown) return;
+      isShuttingDown = true;
+
+      appLogger.info(`Received ${signal}. Initiating graceful termination sequence...`);
+
+      const forceExitTimeout = setTimeout(() => {
+        appLogger.error('Graceful shutdown timed out. Forcing process exit.');
+        process.exit(1);
+      }, 10000);
+
       try {
         await running.stop();
-        // eslint-disable-next-line no-console
-        console.info('Server stopped gracefully. Exiting process.');
+        clearTimeout(forceExitTimeout);
+        appLogger.info('All subsystems shut down cleanly. Exiting.');
         process.exit(0);
       } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error('Error during graceful shutdown:', err);
+        clearTimeout(forceExitTimeout);
+        appLogger.error('Error during shutdown sequence', err as Error);
         process.exit(1);
       }
     };
 
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+    process.on('SIGINT', () => handleShutdown('SIGINT'));
+
+    process.on('uncaughtException', (err: Error) => {
+      appLogger.fatal('Uncaught Exception detected', err);
+      void handleShutdown('uncaughtException');
+    });
+
+    process.on('unhandledRejection', (reason: unknown) => {
+      appLogger.fatal(
+        'Unhandled Promise Rejection detected',
+        reason instanceof Error ? reason : new Error(String(reason)),
+      );
+      void handleShutdown('unhandledRejection');
+    });
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Failed to start server:', error);
+    appLogger.fatal('Fatal error during application startup', error as Error);
     process.exit(1);
   }
 }

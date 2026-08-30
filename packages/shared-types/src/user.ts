@@ -17,6 +17,7 @@ export interface IUser extends Timestamps {
 
 export interface UserProfile {
   id: ID;
+  email?: string;
   username: string;
   displayName: string;
   avatarUrl?: string;

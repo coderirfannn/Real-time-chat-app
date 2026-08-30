@@ -1,8 +1,8 @@
 # BRAIN.md — ChatLock Platform Architecture & System Design
 
 **Project**: ChatLock — Production-Grade Real-Time Messaging Platform  
-**Version**: 0.1.0 (Task 01 — Project Foundation)  
-**Status**: Foundation Established
+**Version**: 0.5.0 (Task 05 — Conversation System)  
+**Status**: Direct Conversation System Established
 
 ---
 
@@ -13,10 +13,11 @@ ChatLock is a secure, high-concurrency, real-time messaging platform built for c
 ### Key Architectural Pillars
 
 1. **Strict Monorepo Separation**: Clear boundary between client apps, server backends, and shared logic (`shared-types`, `validation`, `config`).
-2. **Type Safety & Schema Integrity**: End-to-end TypeScript strict mode, Zod runtime validation, and shared contract types.
-3. **Secret Isolation**: Guaranteed separation preventing backend credentials or private tokens from leaking into client bundles.
-4. **Resilient Real-Time Event Pipeline**: Horizontal scaling with Redis Streams/Pub-Sub adapters for multi-node Socket.IO deployments.
-5. **Defense in Depth**: Zero-trust token rotation, rate limiting, helmet security headers, and structured logging.
+2. **Layered Backend Decoupling**: Unidirectional request flow (`controller -> service -> repository -> database`) preventing route pollution.
+3. **Type Safety & Schema Integrity**: End-to-end TypeScript strict mode, Zod runtime validation, and shared contract types.
+4. **Secret Isolation**: Guaranteed separation preventing backend credentials or private tokens from leaking into client bundles.
+5. **Resilient Real-Time Event Pipeline**: Horizontal scaling with Redis Streams/Pub-Sub adapters for multi-node Socket.IO deployments.
+6. **Defense in Depth**: Zero-trust token rotation, rate limiting, helmet security headers, request ID correlation, and structured logging.
 
 ---
 
@@ -27,6 +28,14 @@ ChatLock/
 ├── apps/
 │   ├── mobile/             # React Native + Expo client application
 │   └── server/             # Node.js + Express + Socket.IO backend service
+│       ├── controllers/    # HTTP request/response handlers
+│       ├── services/       # Domain business logic
+│       ├── repositories/   # Decoupled persistence access layer
+│       ├── database/       # MongoDB connection lifecycle management
+│       ├── redis/          # Redis connection lifecycle management
+│       ├── middleware/     # Security, Request ID, logging, validation, errors
+│       ├── errors/         # Stable error codes and AppError hierarchy
+│       └── utils/          # Structured logger, async handler
 │
 ├── packages/
 │   ├── shared-types/       # Canonical TypeScript domain types & API contracts
@@ -55,10 +64,10 @@ ChatLock/
 | --------------------- | ----------------------------- | ------------------------------------------------------ |
 | **Monorepo Manager**  | pnpm 11+ Workspaces           | Dependency isolation, workspace linking, fast caching  |
 | **Language**          | TypeScript 5.7+               | Strict static typing across all apps and packages      |
-| **Backend Engine**    | Node.js 20+ / Express 4.21+   | REST API gateway and routing                           |
+| **Backend Engine**    | Node.js 20+ / Express 4.21+   | REST API gateway, layered routing, structured logging  |
 | **Real-Time Gateway** | Socket.IO 4+ (Planned)        | Low-latency duplex bidirectional messaging             |
-| **Database**          | MongoDB 7.0 + Mongoose        | Primary document persistence                           |
-| **Cache & Pub/Sub**   | Redis 7.2                     | Session store, rate limiting, Socket.IO adapter        |
+| **Database**          | MongoDB 7.0 + Mongoose 8+     | Primary document persistence & connection lifecycle    |
+| **Cache & Pub/Sub**   | Redis 7.2 + ioredis 5+        | Session store, state cache, pub/sub, health checks     |
 | **Mobile Client**     | React Native 0.76+ / Expo 52+ | iOS & Android cross-platform client                    |
 | **Schema Validation** | Zod 3.24+                     | Runtime validation for envs, payloads, and API schemas |
 | **Testing**           | Vitest 3+ & Supertest         | Fast unit and integration testing                      |
@@ -89,10 +98,12 @@ The environment system strictly validates 13 distinct categories in `@chatlock/c
 
 ## 5. Development Roadmap
 
-- [x] **Task 01 — Project Foundation** (Current): Monorepo workspace, TypeScript strict mode, ESLint/Prettier, centralized Zod environment validation, shared packages, server skeleton, Expo mobile skeleton, Docker (MongoDB/Redis), CI workflow, and architecture documentation.
-- [ ] **Task 02 — Authentication & Identity**: Secure user registration, bcrypt password hashing, JWT access/refresh token rotation, auth middleware.
-- [ ] **Task 03 — Data Models & Storage**: Mongoose schemas for User, Conversation, Message, and indexes for optimized query performance.
-- [ ] **Task 04 — Real-Time Engine & Socket.IO**: Socket.IO gateway, Redis adapter, room management, typing indicators, delivery/read receipts, presence.
-- [ ] **Task 05 — Mobile Client UI & State**: React Native navigation, authentication flows, chat screens, optimistic UI updates, offline cache.
-- [ ] **Task 06 — Media & Push Notifications**: Secure file/media uploads, background job queues, push notification delivery (FCM/APNs).
-- [ ] **Task 07 — Security & Production Readiness**: End-to-end encryption prep, rate limiting, production Docker images, observability (Sentry/Prometheus).
+- [x] **Task 01 — Project Foundation**: Monorepo workspace, TypeScript strict mode, ESLint/Prettier, centralized Zod environment validation, shared packages, server skeleton, Expo mobile skeleton, Docker (MongoDB/Redis), CI workflow, and architecture documentation.
+- [x] **Task 02 — Backend Core**: Layered Express architecture (`controller -> service -> repository -> database`), request IDs, structured logging, centralized error handling with stable error codes, `/health`, `/health/live`, `/health/ready` endpoints, MongoDB & Redis connection lifecycle management, and graceful shutdown.
+- [x] **Task 03 — Database Domain Model**: MongoDB domain models (`User`, `Session`, `Conversation`, `Message`, `MessageReceipt`, `Device`), TTL indexing, direct conversation deduplication (`directKey`), message idempotency indexes, and decoupled repository layer.
+- [x] **Task 04 — Production Authentication**: Bcrypt password hashing, JWT access tokens, revocable rotating refresh sessions (SHA-256 token hashes in MongoDB), `requireAuth`/`optionalAuth` authorization middleware, rate limiting, and `/api/v1/auth/*` endpoints.
+- [x] **Task 05 — Conversation System**: Direct conversation management (`GET /api/v1/conversations`, `POST /api/v1/conversations`, `GET /api/v1/conversations/:id`), strict participant-only authorization, duplicate chat prevention (`directKey`), unread metadata, and cursor/page pagination.
+- [ ] **Task 06 — Real-Time Engine & Socket.IO**: Socket.IO gateway, Redis adapter, room management, typing indicators, delivery/read receipts, presence.
+- [ ] **Task 07 — Mobile Client UI & State**: React Native navigation, authentication flows, chat screens, optimistic UI updates, offline cache.
+- [ ] **Task 08 — Media & Push Notifications**: Secure file/media uploads, background job queues, push notification delivery (FCM/APNs).
+- [ ] **Task 09 — Security & Production Readiness**: End-to-end encryption prep, rate limiting, production Docker images, observability (Sentry/Prometheus).
