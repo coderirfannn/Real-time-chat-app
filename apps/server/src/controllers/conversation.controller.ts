@@ -91,6 +91,29 @@ export class ConversationController {
       timestamp: new Date().toISOString(),
     });
   };
+
+  public listMessages = async (
+    req: Request<ConversationIdParamsInput, unknown, unknown, ConversationPaginationInput>,
+    res: Response<ApiResponse<unknown>>,
+  ): Promise<void> => {
+    if (!req.user) {
+      throw new UnauthorizedError('Authentication required');
+    }
+
+    const { page, limit } = req.query;
+
+    const result = await this.service.getConversationMessages(req.params.id, req.user.id, {
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 50,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Messages retrieved successfully',
+      data: result,
+      timestamp: new Date().toISOString(),
+    });
+  };
 }
 
 export const conversationController = new ConversationController();

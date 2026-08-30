@@ -60,14 +60,32 @@ export class MessageRepository extends BaseRepository<IMessageDoc> {
     pagination: PaginationOptions,
   ): Promise<PaginatedResult<IMessageDoc>> {
     const convObj = new Types.ObjectId(conversationId);
-    return this.paginate(
-      { conversationId: convObj },
-      {
-        page: pagination.page,
-        limit: pagination.limit,
-        sort: { createdAt: -1 },
-      },
-    );
+    const page = Math.max(1, pagination.page);
+    const limit = Math.max(1, Math.min(100, pagination.limit));
+    const skip = (page - 1) * limit;
+
+    const [docs, total] = await Promise.all([
+      this.model
+        .find({ conversationId: convObj })
+        .populate('senderId', SENDER_FIELDS)
+        .sort(pagination.sort || { createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.count({ conversationId: convObj }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      docs,
+      total,
+      page,
+      limit,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+    };
   }
 
   public async softDelete(messageId: string | Types.ObjectId): Promise<IMessageDoc | null> {

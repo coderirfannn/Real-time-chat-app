@@ -32,4 +32,13 @@ router.get(
   asyncHandler(conversationController.getConversation),
 );
 
+router.get(
+  '/:id/messages',
+  validate({
+    params: conversationIdParamsSchema,
+    query: conversationPaginationSchema,
+  }),
+  asyncHandler(conversationController.listMessages),
+);
+
 export default router;

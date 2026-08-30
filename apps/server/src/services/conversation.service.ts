@@ -10,7 +10,9 @@ import {
   messageReceiptRepository,
   type MessageReceiptRepository,
 } from '../repositories/message-receipt.repository.js';
+import { messageRepository, type MessageRepository } from '../repositories/message.repository.js';
 import type { IConversationDoc } from '../models/conversation.model.js';
+import type { PaginatedResult } from '../repositories/base.repository.js';
 import { BadRequestError, NotFoundError, ForbiddenError } from '../errors/app-error.js';
 
 export interface ConversationDetailResponse {
@@ -24,6 +26,7 @@ export class ConversationService {
     private readonly conversationRepo: ConversationRepository = conversationRepository,
     private readonly userRepo: UserRepository = userRepository,
     private readonly receiptRepo: MessageReceiptRepository = messageReceiptRepository,
+    private readonly messageRepo: MessageRepository = messageRepository,
   ) {}
 
   /**
@@ -157,6 +160,43 @@ export class ConversationService {
     return {
       conversation: conv.toJSON(),
       unreadCount,
+    };
+  }
+
+  /**
+   * Retrieves paginated messages for a conversation, enforcing participant access.
+   */
+  public async getConversationMessages(
+    conversationId: string,
+    currentUserId: string,
+    pagination: { page?: number; limit?: number } = {},
+  ): Promise<PaginatedResult<Record<string, unknown>>> {
+    const cleanConvId = conversationId.trim();
+
+    if (!Types.ObjectId.isValid(cleanConvId)) {
+      throw new BadRequestError('Invalid conversation ID format');
+    }
+
+    const isParticipant = await this.conversationRepo.isParticipant(cleanConvId, currentUserId);
+    if (!isParticipant) {
+      throw new ForbiddenError(
+        'You do not have permission to access messages in this conversation',
+      );
+    }
+
+    const result = await this.messageRepo.findConversationHistory(cleanConvId, {
+      page: pagination.page || 1,
+      limit: pagination.limit || 50,
+    });
+
+    return {
+      docs: result.docs.map((doc) => doc.toJSON()),
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+      totalPages: result.totalPages,
+      hasNextPage: result.hasNextPage,
+      hasPrevPage: result.hasPrevPage,
     };
   }
 }
