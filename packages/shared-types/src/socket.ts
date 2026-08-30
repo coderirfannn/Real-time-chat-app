@@ -18,13 +18,26 @@ export enum SocketEvents {
   ERROR = 'error',
 }
 
+export interface SocketUserContext {
+  id: ID;
+  email: string;
+  username: string;
+  deviceId?: string;
+}
+
 export interface ClientToServerEvents {
   [SocketEvents.AUTHENTICATE]: (
     token: string,
-    callback: (res: { success: boolean }) => void,
+    callback: (res: { success: boolean; error?: string }) => void,
   ) => void;
-  [SocketEvents.JOIN_ROOM]: (roomId: string) => void;
-  [SocketEvents.LEAVE_ROOM]: (roomId: string) => void;
+  [SocketEvents.JOIN_ROOM]: (
+    payload: { conversationId: ID } | string,
+    callback?: (res: { success: boolean; room?: string; error?: string }) => void,
+  ) => void;
+  [SocketEvents.LEAVE_ROOM]: (
+    payload: { conversationId: ID } | string,
+    callback?: (res: { success: boolean; room?: string; error?: string }) => void,
+  ) => void;
   [SocketEvents.SEND_MESSAGE]: (
     payload: { conversationId: ID; content: string; tempId?: string },
     callback?: (res: { success: boolean; messageId?: ID; error?: string }) => void,
@@ -51,7 +64,6 @@ export interface InterServerEvents {
 }
 
 export interface SocketData {
-  userId: ID;
-  username: string;
+  user: SocketUserContext;
   authenticatedAt: number;
 }

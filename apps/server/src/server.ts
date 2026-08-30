@@ -1,8 +1,9 @@
-import type { Server } from 'http';
+import http, { type Server } from 'http';
 import { createApp } from './app.js';
 import { config } from './config/index.js';
 import { connectMongo, disconnectMongo } from './database/connection.js';
 import { connectRedis, disconnectRedis } from './redis/client.js';
+import { initSocketServer, closeSocketIO } from './socket/index.js';
 import { logger } from './utils/logger.js';
 
 const serverLogger = logger.child('Server');
@@ -23,7 +24,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
   const shouldConnectDb = options.connectDatabase ?? true;
   const shouldConnectRedis = options.connectRedis ?? true;
 
-  // Initialize database connection if enabled
+  // 1. Initialize database connection if enabled
   if (shouldConnectDb) {
     try {
       await connectMongo();
@@ -35,7 +36,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     }
   }
 
-  // Initialize Redis connection if enabled
+  // 2. Initialize Redis connection if enabled
   if (shouldConnectRedis) {
     try {
       await connectRedis();
@@ -47,10 +48,15 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     }
   }
 
+  // 3. Create Express app and HTTP server
   const app = createApp();
+  const server = http.createServer(app);
+
+  // 4. Attach Socket.IO gateway
+  initSocketServer(server);
 
   return new Promise((resolve) => {
-    const server = app.listen(port, () => {
+    server.listen(port, () => {
       serverLogger.info(`Server running on port ${port} in [${config.app.env}] mode`, {
         port,
         env: config.app.env,
@@ -60,7 +66,14 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
       const stop = async (): Promise<void> => {
         serverLogger.info('Initiating graceful server shutdown...');
 
-        // 1. Close HTTP server
+        // 1. Close Socket.IO server
+        try {
+          await closeSocketIO();
+        } catch (err) {
+          serverLogger.error('Error closing Socket.IO during shutdown', err as Error);
+        }
+
+        // 2. Close HTTP server
         await new Promise<void>((res, rej) => {
           server.close((err) => {
             if (err) rej(err);
@@ -71,14 +84,14 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
           });
         });
 
-        // 2. Disconnect Redis
+        // 3. Disconnect Redis
         try {
           await disconnectRedis();
         } catch (err) {
           serverLogger.error('Error disconnecting Redis during shutdown', err as Error);
         }
 
-        // 3. Disconnect MongoDB
+        // 4. Disconnect MongoDB
         try {
           await disconnectMongo();
         } catch (err) {
