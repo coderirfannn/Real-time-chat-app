@@ -3,6 +3,9 @@ import {
   SocketEvents,
   type ClientToServerEvents,
   type ServerToClientEvents,
+  type SendMessagePayload,
+  type MessageAckResponse,
+  type IMessage,
 } from '@chatlock/shared-types';
 import { mobileConfig } from '../config/env.js';
 
@@ -111,6 +114,46 @@ export class SocketService {
   }
 
   /**
+   * Emits message:send with clientMessageId and returns server ACK response.
+   */
+  public async sendMessage(payload: SendMessagePayload): Promise<MessageAckResponse> {
+    const socket = this.getSocket();
+
+    if (!socket.connected) {
+      return {
+        success: false,
+        clientMessageId: payload.clientMessageId,
+        errorCode: 'SOCKET_DISCONNECTED',
+        error: 'Socket is not connected',
+      };
+    }
+
+    return new Promise((resolve) => {
+      socket.emit(SocketEvents.MESSAGE_SEND, payload, (ack: MessageAckResponse) => {
+        resolve(ack);
+      });
+    });
+  }
+
+  /**
+   * Registers a listener for new incoming messages across joined conversation rooms.
+   */
+  public onNewMessage(listener: (message: IMessage) => void): () => void {
+    const socket = this.getSocket();
+    socket.on(SocketEvents.MESSAGE_NEW, listener);
+    return () => socket.off(SocketEvents.MESSAGE_NEW, listener);
+  }
+
+  /**
+   * Registers a listener for sender message acknowledgment events.
+   */
+  public onMessageSent(listener: (ack: MessageAckResponse) => void): () => void {
+    const socket = this.getSocket();
+    socket.on(SocketEvents.MESSAGE_SENT, listener);
+    return () => socket.off(SocketEvents.MESSAGE_SENT, listener);
+  }
+
+  /**
    * Checks if socket is currently connected.
    */
   public isConnected(): boolean {
@@ -126,7 +169,6 @@ export class SocketService {
 
   private setupDefaultListeners(socket: TypedClientSocket): void {
     socket.on('connect', () => {
-      // Re-authenticated on reconnect if token exists
       if (this.currentToken && socket.auth) {
         socket.auth = { token: this.currentToken };
       }

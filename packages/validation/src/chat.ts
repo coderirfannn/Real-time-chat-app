@@ -40,8 +40,9 @@ export const conversationIdParamsSchema = z.object({
 
 export const sendMessageSchema = z.object({
   conversationId: idSchema,
+  clientMessageId: z.string().min(1, 'clientMessageId is required').max(100),
   content: z.string().min(1, 'Message content cannot be empty').max(5000, 'Message is too long'),
-  type: z.enum(['text', 'image', 'file', 'audio', 'video']).default('text'),
+  type: z.enum(['text', 'image', 'file', 'audio', 'video', 'system']).default('text'),
   replyToMessageId: idSchema.optional(),
   tempId: z.string().optional(),
 });

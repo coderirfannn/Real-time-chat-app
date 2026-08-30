@@ -1,8 +1,8 @@
 # BRAIN.md — ChatLock Platform Architecture & System Design
 
 **Project**: ChatLock — Production-Grade Real-Time Messaging Platform  
-**Version**: 0.6.0 (Task 06 — Socket.IO Infrastructure)  
-**Status**: Socket.IO Real-Time Infrastructure Established
+**Version**: 0.7.0 (Task 07 — Reliable Real-Time Messaging)  
+**Status**: Reliable Real-Time Messaging Engine Established
 
 ---
 
@@ -104,7 +104,7 @@ The environment system strictly validates 13 distinct categories in `@chatlock/c
 - [x] **Task 04 — Production Authentication**: Bcrypt password hashing, JWT access tokens, revocable rotating refresh sessions (SHA-256 token hashes in MongoDB), `requireAuth`/`optionalAuth` authorization middleware, rate limiting, and `/api/v1/auth/*` endpoints.
 - [x] **Task 05 — Conversation System**: Direct conversation management (`GET /api/v1/conversations`, `POST /api/v1/conversations`, `GET /api/v1/conversations/:id`), strict participant-only authorization, duplicate chat prevention (`directKey`), unread metadata, and cursor/page pagination.
 - [x] **Task 06 — Socket.IO Infrastructure**: Cross-service real-time foundation, JWT handshake authentication, `ConnectionManager` tracking duplicate/concurrent sockets, `RoomManager` enforcing strict conversation authorization (`conversation:{conversationId}`), typed event contracts, mobile `SocketService`, and graceful disconnect/reconnect handling.
-- [ ] **Task 07 — Real-Time Messaging Engine**: Message sending, delivery/read receipts, typing indicators, Redis pub/sub adapter, and presence heartbeats.
+- [x] **Task 07 — Reliable Real-Time Messaging**: Real-time text messaging pipeline (`message:send`, `message:sent`, `message:new`), client message ID deduplication (`clientMessageId`), idempotency verification, zero-trust sender derivation, ACK callbacks, and room broadcasting.
 - [ ] **Task 08 — Mobile Client UI & State**: React Native navigation, authentication flows, chat screens, optimistic UI updates, offline cache.
 - [ ] **Task 09 — Media & Push Notifications**: Secure file/media uploads, background job queues, push notification delivery (FCM/APNs).
 - [ ] **Task 10 — Security & Production Readiness**: End-to-end encryption prep, rate limiting, production Docker images, observability (Sentry/Prometheus).

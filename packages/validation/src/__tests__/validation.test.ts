@@ -27,6 +27,7 @@ describe('Validation Schemas', () => {
   it('validates message payload', () => {
     const message = {
       conversationId: '507f1f77bcf86cd799439011',
+      clientMessageId: 'client-msg-uuid-12345',
       content: 'Hello World',
       type: 'text' as const,
     };

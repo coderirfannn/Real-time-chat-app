@@ -1,5 +1,5 @@
 import type { ID } from './common.js';
-import type { IMessage, MessageDeliveryStatus } from './chat.js';
+import type { IMessage, MessageDeliveryStatus, MessageType } from './chat.js';
 import type { UserStatus } from './user.js';
 
 export enum SocketEvents {
@@ -8,6 +8,9 @@ export enum SocketEvents {
   AUTHENTICATE = 'authenticate',
   JOIN_ROOM = 'join_room',
   LEAVE_ROOM = 'leave_room',
+  MESSAGE_SEND = 'message:send',
+  MESSAGE_SENT = 'message:sent',
+  MESSAGE_NEW = 'message:new',
   SEND_MESSAGE = 'send_message',
   RECEIVE_MESSAGE = 'receive_message',
   MESSAGE_DELIVERED = 'message_delivered',
@@ -25,6 +28,24 @@ export interface SocketUserContext {
   deviceId?: string;
 }
 
+export interface SendMessagePayload {
+  conversationId: ID;
+  clientMessageId: string;
+  content: string;
+  type?: MessageType;
+  replyToMessageId?: ID;
+  tempId?: string;
+}
+
+export interface MessageAckResponse {
+  success: boolean;
+  clientMessageId: string;
+  serverMessageId?: ID;
+  message?: IMessage;
+  errorCode?: string;
+  error?: string;
+}
+
 export interface ClientToServerEvents {
   [SocketEvents.AUTHENTICATE]: (
     token: string,
@@ -38,15 +59,23 @@ export interface ClientToServerEvents {
     payload: { conversationId: ID } | string,
     callback?: (res: { success: boolean; room?: string; error?: string }) => void,
   ) => void;
+  [SocketEvents.MESSAGE_SEND]: (
+    payload: SendMessagePayload,
+    callback?: (res: MessageAckResponse) => void,
+  ) => void;
   [SocketEvents.SEND_MESSAGE]: (
-    payload: { conversationId: ID; content: string; tempId?: string },
-    callback?: (res: { success: boolean; messageId?: ID; error?: string }) => void,
+    payload: SendMessagePayload | { conversationId: ID; content: string; tempId?: string },
+    callback?: (
+      res: MessageAckResponse | { success: boolean; messageId?: ID; error?: string },
+    ) => void,
   ) => void;
   [SocketEvents.TYPING_START]: (payload: { conversationId: ID }) => void;
   [SocketEvents.TYPING_STOP]: (payload: { conversationId: ID }) => void;
 }
 
 export interface ServerToClientEvents {
+  [SocketEvents.MESSAGE_NEW]: (message: IMessage) => void;
+  [SocketEvents.MESSAGE_SENT]: (ack: MessageAckResponse) => void;
   [SocketEvents.RECEIVE_MESSAGE]: (message: IMessage) => void;
   [SocketEvents.MESSAGE_DELIVERED]: (payload: {
     messageId: ID;

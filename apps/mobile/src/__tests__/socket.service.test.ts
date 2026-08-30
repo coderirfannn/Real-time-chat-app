@@ -48,4 +48,29 @@ describe('Mobile SocketService Unit Tests', () => {
     expect(res.success).toBe(false);
     expect(res.error).toBe('Socket is not connected');
   });
+
+  it('returns failure when sendMessage called while disconnected', async () => {
+    const res = await service.sendMessage({
+      conversationId: '507f1f77bcf86cd799439011',
+      clientMessageId: 'cm_mobile_01',
+      content: 'Hello mobile',
+    });
+    expect(res.success).toBe(false);
+    expect(res.errorCode).toBe('SOCKET_DISCONNECTED');
+    expect(res.error).toBe('Socket is not connected');
+  });
+
+  it('registers and unregisters onNewMessage listeners', () => {
+    const listener = vi.fn();
+    const unsubscribe = service.onNewMessage(listener);
+    expect(unsubscribe).toBeInstanceOf(Function);
+    unsubscribe();
+  });
+
+  it('registers and unregisters onMessageSent listeners', () => {
+    const listener = vi.fn();
+    const unsubscribe = service.onMessageSent(listener);
+    expect(unsubscribe).toBeInstanceOf(Function);
+    unsubscribe();
+  });
 });

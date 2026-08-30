@@ -69,8 +69,8 @@ export function initSocketServer(httpServer: HttpServer): TypedSocketServer {
       isFirstConnection: reg.isFirstConnection,
     });
 
-    // Attach room and lifecycle event handlers
-    registerSocketEvents(socket);
+    // Attach room, lifecycle, and messaging event handlers
+    registerSocketEvents(socket, io);
   });
 
   ioInstance = io;

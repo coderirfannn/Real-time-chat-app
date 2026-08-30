@@ -3,6 +3,8 @@ import { BaseRepository, type PaginationOptions, type PaginatedResult } from './
 import { MessageModel, type IMessageDoc } from '../models/message.model.js';
 import type { MessageType, MessageAttachment } from '@chatlock/shared-types';
 
+const SENDER_FIELDS = '_id username displayName avatarUrl status';
+
 export class MessageRepository extends BaseRepository<IMessageDoc> {
   constructor() {
     super(MessageModel);
@@ -12,10 +14,21 @@ export class MessageRepository extends BaseRepository<IMessageDoc> {
     senderId: string | Types.ObjectId,
     clientMessageId: string,
   ): Promise<IMessageDoc | null> {
-    return this.findOne({
-      senderId: new Types.ObjectId(senderId),
-      clientMessageId: clientMessageId.trim(),
-    });
+    return this.model
+      .findOne({
+        senderId: new Types.ObjectId(senderId),
+        clientMessageId: clientMessageId.trim(),
+      })
+      .populate('senderId', SENDER_FIELDS)
+      .exec();
+  }
+
+  public async findPopulatedById(messageId: string | Types.ObjectId): Promise<IMessageDoc | null> {
+    if (!Types.ObjectId.isValid(messageId)) {
+      return null;
+    }
+
+    return this.model.findById(messageId).populate('senderId', SENDER_FIELDS).exec();
   }
 
   public async createMessage(data: {
@@ -27,7 +40,7 @@ export class MessageRepository extends BaseRepository<IMessageDoc> {
     attachments?: MessageAttachment[];
     replyToMessageId?: string | Types.ObjectId;
   }): Promise<IMessageDoc> {
-    return this.create({
+    const created = await this.create({
       conversationId: new Types.ObjectId(data.conversationId),
       senderId: new Types.ObjectId(data.senderId),
       clientMessageId: data.clientMessageId.trim(),
@@ -38,6 +51,8 @@ export class MessageRepository extends BaseRepository<IMessageDoc> {
         ? new Types.ObjectId(data.replyToMessageId)
         : undefined,
     });
+
+    return (await this.findPopulatedById(created._id.toString())) || created;
   }
 
   public async findConversationHistory(
