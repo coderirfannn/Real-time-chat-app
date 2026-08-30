@@ -1,0 +1,53 @@
+services:
+  # MongoDB - Document Storage
+  mongodb:
+    image: mongo:7.0
+    container_name: chatlock-mongodb-dev
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: chatlock_dev_pass
+      MONGO_INITDB_DATABASE: chatlock
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - chatlock-network
+
+  # Redis - In-Memory Cache, Pub/Sub & Session Store
+  redis:
+    image: redis:7.2-alpine
+    container_name: chatlock-redis-dev
+    restart: unless-stopped
+    command: ['redis-server', '--requirepass', 'chatlock_redis_dev_pass', '--appendonly', 'yes']
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', 'chatlock_redis_dev_pass', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - chatlock-network
+
+networks:
+  chatlock-network:
+    name: chatlock-network
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    name: chatlock_mongodb_data
+  redis_data:
+    name: chatlock_redis_data

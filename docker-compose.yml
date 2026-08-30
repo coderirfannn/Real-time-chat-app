@@ -1,0 +1,6 @@
+# Root Docker Compose (proxies to development services)
+# Run: docker compose up -d
+# Or:  pnpm docker:up
+
+include:
+  - infrastructure/docker/docker-compose.dev.yml

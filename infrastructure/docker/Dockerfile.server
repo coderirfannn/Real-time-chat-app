@@ -1,0 +1,40 @@
+# Production multi-stage Dockerfile for ChatLock Server
+FROM node:20-alpine AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+
+FROM base AS builder
+WORKDIR /app
+COPY pnpm-lock.yaml* pnpm-workspace.yaml package.json ./
+COPY tsconfig.base.json tsconfig.json ./
+COPY packages/ ./packages/
+COPY apps/server/ ./apps/server/
+
+RUN pnpm install --frozen-lockfile || pnpm install
+RUN pnpm --filter="@chatlock/shared-types" build
+RUN pnpm --filter="@chatlock/validation" build
+RUN pnpm --filter="@chatlock/config" build
+RUN pnpm --filter="@chatlock/server" build
+
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=5000
+
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 chatlock
+
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/pnpm-workspace.yaml ./
+COPY --from=builder /app/packages/ ./packages/
+COPY --from=builder /app/apps/server/package.json ./apps/server/
+COPY --from=builder /app/apps/server/dist ./apps/server/dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/server/node_modules ./apps/server/node_modules
+
+USER chatlock
+
+EXPOSE 5000
+
+CMD ["node", "apps/server/dist/index.js"]

@@ -1,0 +1,42 @@
+{
+  "name": "chatlock-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ChatLock - Production-Grade Real-Time Messaging Platform Monorepo",
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "pnpm -r run lint",
+    "lint:fix": "pnpm -r run lint:fix",
+    "test": "pnpm -r run test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "docker:up": "docker compose -f infrastructure/docker/docker-compose.dev.yml up -d",
+    "docker:down": "docker compose -f infrastructure/docker/docker-compose.dev.yml down",
+    "docker:logs": "docker compose -f infrastructure/docker/docker-compose.dev.yml logs -f",
+    "clean": "node scripts/clean.js",
+    "validate:env": "node scripts/validate-env.js",
+    "prepare": "husky || true"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.5",
+    "@typescript-eslint/eslint-plugin": "^8.24.1",
+    "@typescript-eslint/parser": "^8.24.1",
+    "dotenv": "^16.4.7",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^10.0.1",
+    "eslint-plugin-prettier": "^5.2.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3",
+    "prettier": "^3.5.2",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.7"
+  }
+}

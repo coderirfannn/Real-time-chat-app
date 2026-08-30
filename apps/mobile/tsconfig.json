@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "noEmit": true
+  },
+  "include": ["src/**/*", "app.config.ts"],
+  "references": [
+    { "path": "../../packages/shared-types" },
+    { "path": "../../packages/validation" },
+    { "path": "../../packages/config" }
+  ]
+}
