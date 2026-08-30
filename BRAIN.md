@@ -1,8 +1,8 @@
 # BRAIN.md — ChatLock Platform Architecture & System Design
 
 **Project**: ChatLock — Production-Grade Real-Time Messaging Platform  
-**Version**: 0.7.0 (Task 07 — Reliable Real-Time Messaging)  
-**Status**: Reliable Real-Time Messaging Engine Established
+**Version**: 0.8.0 (Task 08 — React Native Application Architecture)  
+**Status**: Mobile Application Architecture Established
 
 ---
 
@@ -105,6 +105,7 @@ The environment system strictly validates 13 distinct categories in `@chatlock/c
 - [x] **Task 05 — Conversation System**: Direct conversation management (`GET /api/v1/conversations`, `POST /api/v1/conversations`, `GET /api/v1/conversations/:id`), strict participant-only authorization, duplicate chat prevention (`directKey`), unread metadata, and cursor/page pagination.
 - [x] **Task 06 — Socket.IO Infrastructure**: Cross-service real-time foundation, JWT handshake authentication, `ConnectionManager` tracking duplicate/concurrent sockets, `RoomManager` enforcing strict conversation authorization (`conversation:{conversationId}`), typed event contracts, mobile `SocketService`, and graceful disconnect/reconnect handling.
 - [x] **Task 07 — Reliable Real-Time Messaging**: Real-time text messaging pipeline (`message:send`, `message:sent`, `message:new`), client message ID deduplication (`clientMessageId`), idempotency verification, zero-trust sender derivation, ACK callbacks, and room broadcasting.
-- [ ] **Task 08 — Mobile Client UI & State**: React Native navigation, authentication flows, chat screens, optimistic UI updates, offline cache.
-- [ ] **Task 09 — Media & Push Notifications**: Secure file/media uploads, background job queues, push notification delivery (FCM/APNs).
-- [ ] **Task 10 — Security & Production Readiness**: End-to-end encryption prep, rate limiting, production Docker images, observability (Sentry/Prometheus).
+- [x] **Task 08 — React Native Application Architecture**: Mobile client layered architecture (`Expo Router`, `Zustand` for client state, `TanStack Query` for server state, centralized `ApiClient` with transparent 401 token refresh mutex, `SecureStorageService` keychain abstraction, and centralized `SocketManager` singleton).
+- [ ] **Task 09 — Mobile Client UI & Chat Screens**: Authentication UI flows (login/register), conversation list with unread badges, real-time chat screen with optimistic updates, typing indicators, and delivery receipts.
+- [ ] **Task 10 — Media & Push Notifications**: Secure file/media uploads, background job queues, push notification delivery (FCM/APNs).
+- [ ] **Task 11 — Security & Production Readiness**: End-to-end encryption prep, rate limiting, production Docker images, observability (Sentry/Prometheus).

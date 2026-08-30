@@ -17,6 +17,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...config,
     name: appName,
     slug: 'chatlock',
+    scheme: 'chatlock',
     version: '0.1.0',
     orientation: 'portrait',
     icon: './assets/icon.png',
