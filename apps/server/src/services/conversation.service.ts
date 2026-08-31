@@ -12,7 +12,7 @@ import {
 } from '../repositories/message-receipt.repository.js';
 import { messageRepository, type MessageRepository } from '../repositories/message.repository.js';
 import type { IConversationDoc } from '../models/conversation.model.js';
-import type { PaginatedResult } from '../repositories/base.repository.js';
+import type { CursorPaginatedResult } from '@chatlock/shared-types';
 import { BadRequestError, NotFoundError, ForbiddenError } from '../errors/app-error.js';
 
 export interface ConversationDetailResponse {
@@ -164,13 +164,18 @@ export class ConversationService {
   }
 
   /**
-   * Retrieves paginated messages for a conversation, enforcing participant access.
+   * Retrieves cursor-paginated messages for a conversation, enforcing participant access.
    */
   public async getConversationMessages(
     conversationId: string,
     currentUserId: string,
-    pagination: { page?: number; limit?: number } = {},
-  ): Promise<PaginatedResult<Record<string, unknown>>> {
+    options: {
+      cursor?: string;
+      limit?: number;
+      direction?: 'before' | 'after';
+      page?: number;
+    } = {},
+  ): Promise<CursorPaginatedResult<Record<string, unknown>>> {
     const cleanConvId = conversationId.trim();
 
     if (!Types.ObjectId.isValid(cleanConvId)) {
@@ -184,19 +189,18 @@ export class ConversationService {
       );
     }
 
-    const result = await this.messageRepo.findConversationHistory(cleanConvId, {
-      page: pagination.page || 1,
-      limit: pagination.limit || 50,
+    const result = await this.messageRepo.findMessagesByCursor(cleanConvId, {
+      cursor: options.cursor,
+      limit: options.limit || 50,
+      direction: options.direction || 'before',
     });
 
     return {
-      docs: result.docs.map((doc) => doc.toJSON()),
-      total: result.total,
-      page: result.page,
+      messages: result.messages.map((doc) => doc.toJSON()),
+      nextCursor: result.nextCursor,
+      prevCursor: result.prevCursor,
+      hasMore: result.hasMore,
       limit: result.limit,
-      totalPages: result.totalPages,
-      hasNextPage: result.hasNextPage,
-      hasPrevPage: result.hasPrevPage,
     };
   }
 }

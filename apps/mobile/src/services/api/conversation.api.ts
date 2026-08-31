@@ -2,8 +2,9 @@ import { apiClient } from './client';
 import type {
   CreateDirectConversationInput,
   ConversationPaginationInput,
+  MessageCursorPaginationInput,
 } from '@chatlock/validation';
-import type { IConversation } from '@chatlock/shared-types';
+import type { IConversation, IMessage, CursorPaginatedResult } from '@chatlock/shared-types';
 
 export class ConversationApi {
   public async getConversations(params?: ConversationPaginationInput): Promise<IConversation[]> {
@@ -22,15 +23,12 @@ export class ConversationApi {
 
   public async getMessages(
     conversationId: string,
-    params?: ConversationPaginationInput,
-  ): Promise<{
-    docs: unknown[];
-    total: number;
-    page: number;
-    totalPages: number;
-    hasNextPage: boolean;
-  }> {
-    return apiClient.get(`/conversations/${conversationId}/messages`, { params });
+    params?: MessageCursorPaginationInput,
+  ): Promise<CursorPaginatedResult<IMessage>> {
+    return apiClient.get<CursorPaginatedResult<IMessage>>(
+      `/conversations/${conversationId}/messages`,
+      { params },
+    );
   }
 }
 

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { conversationApi } from '../../../services/api/conversation.api';
 import { socketManager } from '../../../services/socket/socket.manager';
 import { useAuthStore } from '../../../store/auth.store';
 import { buildInvertedChatFeed } from '../../../utils/message-grouper';
+import { reconcileChatMessages } from '../../../utils/message-reconciler';
 import type { LocalMessage, ChatFeedItem } from '../../../types/chat.types';
 import type { IMessage, MessageAckResponse, UserProfile } from '@chatlock/shared-types';
 
@@ -12,9 +13,12 @@ export interface UseChatReturn {
   recipient: UserProfile;
   isLoading: boolean;
   isSending: boolean;
+  isFetchingNextPage: boolean;
+  hasNextPage: boolean;
   error: Error | null;
   sendMessage: (content: string) => Promise<void>;
   retryMessage: (clientMessageId: string) => Promise<void>;
+  loadMoreMessages: () => void;
   refetchHistory: () => Promise<unknown>;
 }
 
@@ -26,7 +30,8 @@ export function useChat(conversationId: string): UseChatReturn {
   const currentUser = useAuthStore((state) => state.user);
   const currentUserId = currentUser?.id || '';
 
-  const [localMessages, setLocalMessages] = useState<LocalMessage[]>([]);
+  const [socketMessages, setSocketMessages] = useState<LocalMessage[]>([]);
+  const [optimisticMessages, setOptimisticMessages] = useState<LocalMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
 
   // 1. Fetch conversation details (participants & recipient)
@@ -36,15 +41,26 @@ export function useChat(conversationId: string): UseChatReturn {
     enabled: Boolean(conversationId && currentUserId),
   });
 
-  // 2. Fetch message history
+  // 2. Fetch message history with Cursor Pagination
   const {
-    data: historyData,
+    data: infiniteHistory,
     isLoading: isLoadingHistory,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
     error: historyError,
     refetch: refetchHistory,
-  } = useQuery({
+  } = useInfiniteQuery({
     queryKey: ['messages', conversationId],
-    queryFn: () => conversationApi.getMessages(conversationId, { page: 1, limit: 50 }),
+    queryFn: ({ pageParam }) =>
+      conversationApi.getMessages(conversationId, {
+        cursor: pageParam,
+        limit: 50,
+        direction: 'before',
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined,
     enabled: Boolean(conversationId && currentUserId),
     staleTime: 60 * 1000,
   });
@@ -85,37 +101,34 @@ export function useChat(conversationId: string): UseChatReturn {
     };
   }, [conversationId]);
 
-  // 4. Socket Listeners: onNewMessage & onMessageSent
+  // 4. Socket Listeners: onNewMessage & onMessageSent with safe reconciliation
   useEffect(() => {
     const unsubNew = socketManager.onNewMessage((newMsg: IMessage) => {
       if (newMsg.conversationId !== conversationId) return;
 
-      setLocalMessages((prev) => {
-        // Check if message already exists by ID or clientMessageId
+      const formattedMsg: LocalMessage = {
+        ...newMsg,
+        clientMessageId: newMsg.clientMessageId || `srv_${newMsg.id}`,
+        status: 'delivered',
+      };
+
+      setSocketMessages((prev) => {
         const exists = prev.some(
           (m) =>
             (newMsg.id && m.id === newMsg.id) ||
             (newMsg.clientMessageId && m.clientMessageId === newMsg.clientMessageId),
         );
-
         if (exists) {
           return prev.map((m) => {
             if (
               (newMsg.id && m.id === newMsg.id) ||
               (newMsg.clientMessageId && m.clientMessageId === newMsg.clientMessageId)
             ) {
-              return { ...m, ...newMsg, status: 'delivered' as const };
+              return { ...m, ...formattedMsg };
             }
             return m;
           });
         }
-
-        const formattedMsg: LocalMessage = {
-          ...newMsg,
-          clientMessageId: newMsg.clientMessageId || `srv_${newMsg.id}`,
-          status: 'delivered',
-        };
-
         return [...prev, formattedMsg];
       });
     });
@@ -123,7 +136,7 @@ export function useChat(conversationId: string): UseChatReturn {
     const unsubSent = socketManager.onMessageSent((ack: MessageAckResponse) => {
       if (!ack.clientMessageId) return;
 
-      setLocalMessages((prev) =>
+      setOptimisticMessages((prev) =>
         prev.map((m) => {
           if (m.clientMessageId === ack.clientMessageId) {
             return {
@@ -166,7 +179,7 @@ export function useChat(conversationId: string): UseChatReturn {
         },
       };
 
-      setLocalMessages((prev) => [...prev, optimisticMessage]);
+      setOptimisticMessages((prev) => [...prev, optimisticMessage]);
       setIsSending(true);
 
       try {
@@ -177,7 +190,7 @@ export function useChat(conversationId: string): UseChatReturn {
           type: 'text',
         });
 
-        setLocalMessages((prev) =>
+        setOptimisticMessages((prev) =>
           prev.map((m) => {
             if (m.clientMessageId === clientMessageId) {
               return {
@@ -190,7 +203,7 @@ export function useChat(conversationId: string): UseChatReturn {
           }),
         );
       } catch {
-        setLocalMessages((prev) =>
+        setOptimisticMessages((prev) =>
           prev.map((m) => {
             if (m.clientMessageId === clientMessageId) {
               return { ...m, status: 'failed' };
@@ -208,10 +221,10 @@ export function useChat(conversationId: string): UseChatReturn {
   // 6. Retry failed message
   const retryMessage = useCallback(
     async (clientMessageId: string) => {
-      const target = localMessages.find((m) => m.clientMessageId === clientMessageId);
+      const target = optimisticMessages.find((m) => m.clientMessageId === clientMessageId);
       if (!target || !target.retryPayload) return;
 
-      setLocalMessages((prev) =>
+      setOptimisticMessages((prev) =>
         prev.map((m) => (m.clientMessageId === clientMessageId ? { ...m, status: 'sending' } : m)),
       );
 
@@ -223,7 +236,7 @@ export function useChat(conversationId: string): UseChatReturn {
           type: 'text',
         });
 
-        setLocalMessages((prev) =>
+        setOptimisticMessages((prev) =>
           prev.map((m) => {
             if (m.clientMessageId === clientMessageId) {
               return {
@@ -236,49 +249,31 @@ export function useChat(conversationId: string): UseChatReturn {
           }),
         );
       } catch {
-        setLocalMessages((prev) =>
+        setOptimisticMessages((prev) =>
           prev.map((m) => (m.clientMessageId === clientMessageId ? { ...m, status: 'failed' } : m)),
         );
       }
     },
-    [localMessages],
+    [optimisticMessages],
   );
 
-  // 7. Merge history messages with local messages
-  const allMessages: LocalMessage[] = useMemo(() => {
-    const historyList: LocalMessage[] = [];
-
-    if (historyData && typeof historyData === 'object' && 'docs' in historyData) {
-      const docs = (historyData as { docs: IMessage[] }).docs || [];
-      docs.forEach((doc) => {
-        historyList.push({
-          ...doc,
-          clientMessageId: doc.clientMessageId || `srv_${doc.id}`,
-          status: 'delivered',
-        });
-      });
+  // 7. Load older messages (upward pagination)
+  const loadMoreMessages = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
     }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-    // Merge without duplicates by clientMessageId / id
-    const messageMap = new Map<string, LocalMessage>();
-
-    historyList.forEach((m) => {
-      const key = m.clientMessageId || m.id || '';
-      if (key) messageMap.set(key, m);
+  // 8. Reconcile history pages with socket and optimistic messages
+  const allMessages: LocalMessage[] = useMemo(() => {
+    return reconcileChatMessages({
+      historyPages: infiniteHistory?.pages,
+      socketMessages,
+      optimisticMessages,
     });
+  }, [infiniteHistory?.pages, socketMessages, optimisticMessages]);
 
-    localMessages.forEach((m) => {
-      const key = m.clientMessageId || m.id || '';
-      if (key) {
-        // Keep latest status from local state
-        messageMap.set(key, m);
-      }
-    });
-
-    return Array.from(messageMap.values());
-  }, [historyData, localMessages]);
-
-  // 8. Build inverted feed items
+  // 9. Build inverted feed items
   const feedItems = useMemo(
     () => buildInvertedChatFeed(allMessages, currentUserId),
     [allMessages, currentUserId],
@@ -289,9 +284,12 @@ export function useChat(conversationId: string): UseChatReturn {
     recipient,
     isLoading: isLoadingConv || isLoadingHistory,
     isSending,
+    isFetchingNextPage: Boolean(isFetchingNextPage),
+    hasNextPage: Boolean(hasNextPage),
     error: (historyError as Error) || null,
     sendMessage,
     retryMessage,
+    loadMoreMessages,
     refetchHistory,
   };
 }

@@ -4,6 +4,7 @@ import type {
   CreateDirectConversationInput,
   ConversationPaginationInput,
   ConversationIdParamsInput,
+  MessageCursorPaginationInput,
 } from '@chatlock/validation';
 import {
   conversationService,
@@ -93,18 +94,19 @@ export class ConversationController {
   };
 
   public listMessages = async (
-    req: Request<ConversationIdParamsInput, unknown, unknown, ConversationPaginationInput>,
+    req: Request<ConversationIdParamsInput, unknown, unknown, MessageCursorPaginationInput>,
     res: Response<ApiResponse<unknown>>,
   ): Promise<void> => {
     if (!req.user) {
       throw new UnauthorizedError('Authentication required');
     }
 
-    const { page, limit } = req.query;
+    const { cursor, limit, direction } = req.query;
 
     const result = await this.service.getConversationMessages(req.params.id, req.user.id, {
-      page: page ? Number(page) : 1,
+      cursor: cursor ? String(cursor) : undefined,
       limit: limit ? Number(limit) : 50,
+      direction: direction === 'after' ? 'after' : 'before',
     });
 
     res.status(200).json({

@@ -3,6 +3,7 @@ import {
   createDirectConversationSchema,
   conversationPaginationSchema,
   conversationIdParamsSchema,
+  messageCursorPaginationSchema,
 } from '@chatlock/validation';
 import { conversationController } from '../controllers/conversation.controller.js';
 import { validate } from '../middleware/validate.middleware.js';
@@ -36,7 +37,7 @@ router.get(
   '/:id/messages',
   validate({
     params: conversationIdParamsSchema,
-    query: conversationPaginationSchema,
+    query: messageCursorPaginationSchema,
   }),
   asyncHandler(conversationController.listMessages),
 );

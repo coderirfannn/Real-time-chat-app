@@ -21,8 +21,16 @@ export default function ChatScreen(): React.JSX.Element {
   const router = useRouter();
 
   const conversationId = id || '';
-  const { feedItems, recipient, isLoading, isSending, sendMessage, retryMessage } =
-    useChat(conversationId);
+  const {
+    feedItems,
+    recipient,
+    isLoading,
+    isSending,
+    isFetchingNextPage,
+    sendMessage,
+    retryMessage,
+    loadMoreMessages,
+  } = useChat(conversationId);
 
   const handleBack = useCallback(() => {
     router.back();
@@ -60,7 +68,12 @@ export default function ChatScreen(): React.JSX.Element {
         {isLoading && feedItems.length === 0 ? (
           <LoadingSpinner />
         ) : (
-          <MessageList items={feedItems} onRetryMessage={retryMessage} />
+          <MessageList
+            items={feedItems}
+            isLoadingMore={isFetchingNextPage}
+            onLoadMore={loadMoreMessages}
+            onRetryMessage={retryMessage}
+          />
         )}
 
         <MessageComposer onSendMessage={sendMessage} disabled={isSending} />

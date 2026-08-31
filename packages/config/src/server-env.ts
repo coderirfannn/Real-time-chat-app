@@ -307,7 +307,9 @@ export function parseAndValidateServerEnv(
   };
 }
 
-export function loadServerConfig(envSource: Record<string, string | undefined> = process.env): ServerConfig {
+export function loadServerConfig(
+  envSource: Record<string, string | undefined> = process.env,
+): ServerConfig {
   if (cachedServerConfig) {
     return cachedServerConfig;
   }

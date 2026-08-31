@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import { BaseRepository, type PaginationOptions, type PaginatedResult } from './base.repository.js';
 import { MessageModel, type IMessageDoc } from '../models/message.model.js';
-import type { MessageType, MessageAttachment } from '@chatlock/shared-types';
+import type { MessageType, MessageAttachment, CursorPaginatedResult } from '@chatlock/shared-types';
 
 const SENDER_FIELDS = '_id username displayName avatarUrl status';
 
@@ -85,6 +85,58 @@ export class MessageRepository extends BaseRepository<IMessageDoc> {
       totalPages,
       hasNextPage: page < totalPages,
       hasPrevPage: page > 1,
+    };
+  }
+
+  public async findMessagesByCursor(
+    conversationId: string | Types.ObjectId,
+    options: {
+      cursor?: string;
+      limit?: number;
+      direction?: 'before' | 'after';
+    } = {},
+  ): Promise<CursorPaginatedResult<IMessageDoc>> {
+    const convObj = new Types.ObjectId(conversationId);
+    const limit = Math.max(1, Math.min(100, options.limit || 50));
+    const direction = options.direction || 'before';
+
+    const query: Record<string, unknown> = {
+      conversationId: convObj,
+    };
+
+    if (options.cursor && Types.ObjectId.isValid(options.cursor)) {
+      const cursorObj = new Types.ObjectId(options.cursor);
+      if (direction === 'before') {
+        query._id = { $lt: cursorObj };
+      } else {
+        query._id = { $gt: cursorObj };
+      }
+    }
+
+    const sortOrder = direction === 'before' ? -1 : 1;
+
+    const docs = await this.model
+      .find(query)
+      .populate('senderId', SENDER_FIELDS)
+      .sort({ _id: sortOrder })
+      .limit(limit + 1)
+      .exec();
+
+    const hasMore = docs.length > limit;
+    const paginatedDocs = hasMore ? docs.slice(0, limit) : docs;
+
+    const lastDoc = paginatedDocs.length > 0 ? paginatedDocs[paginatedDocs.length - 1] : undefined;
+    const firstDoc = paginatedDocs.length > 0 ? paginatedDocs[0] : undefined;
+
+    const nextCursor = lastDoc ? lastDoc._id.toString() : null;
+    const prevCursor = firstDoc ? firstDoc._id.toString() : null;
+
+    return {
+      messages: paginatedDocs,
+      nextCursor: hasMore ? nextCursor : null,
+      prevCursor,
+      hasMore,
+      limit,
     };
   }
 

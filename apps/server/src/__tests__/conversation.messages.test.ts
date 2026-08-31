@@ -41,9 +41,9 @@ describe('GET /api/v1/conversations/:id/messages Integration Tests', () => {
     expect(res.body.error).toBe(ErrorCode.FORBIDDEN);
   });
 
-  it('returns paginated message history for authorized participant', async () => {
+  it('returns cursor-paginated message history for authorized participant', async () => {
     const mockMessagesResult = {
-      docs: [
+      messages: [
         {
           _id: new Types.ObjectId().toString(),
           conversationId: validConversationId,
@@ -53,33 +53,22 @@ describe('GET /api/v1/conversations/:id/messages Integration Tests', () => {
           createdAt: new Date().toISOString(),
         },
       ],
-      total: 1,
-      page: 1,
+      nextCursor: null,
+      prevCursor: null,
+      hasMore: false,
       limit: 50,
-      totalPages: 1,
-      hasNextPage: false,
-      hasPrevPage: false,
     };
 
-    vi.spyOn(conversationService, 'getConversationMessages').mockResolvedValue(
-      mockMessagesResult as unknown as {
-        docs: Record<string, unknown>[];
-        total: number;
-        page: number;
-        limit: number;
-        totalPages: number;
-        hasNextPage: boolean;
-        hasPrevPage: boolean;
-      },
-    );
+    vi.spyOn(conversationService, 'getConversationMessages').mockResolvedValue(mockMessagesResult);
 
     const res = await request(app)
-      .get(`/api/v1/conversations/${validConversationId}/messages?page=1&limit=50`)
+      .get(`/api/v1/conversations/${validConversationId}/messages?limit=50`)
       .set('Authorization', `Bearer ${userAToken}`);
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.data.docs).toHaveLength(1);
-    expect(res.body.data.docs[0].content).toBe('Hello World');
+    expect(res.body.data.messages).toHaveLength(1);
+    expect(res.body.data.messages[0].content).toBe('Hello World');
+    expect(res.body.data.hasMore).toBe(false);
   });
 });

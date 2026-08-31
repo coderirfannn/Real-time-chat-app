@@ -4,7 +4,9 @@ import { ConversationService } from '../../services/conversation.service.js';
 import type { ConversationRepository } from '../../repositories/conversation.repository.js';
 import type { UserRepository } from '../../repositories/user.repository.js';
 import type { MessageReceiptRepository } from '../../repositories/message-receipt.repository.js';
+import type { MessageRepository } from '../../repositories/message.repository.js';
 import type { IConversationDoc } from '../../models/conversation.model.js';
+import type { IMessageDoc } from '../../models/message.model.js';
 import type { IUserDoc } from '../../models/user.model.js';
 import { BadRequestError, NotFoundError, ForbiddenError } from '../../errors/app-error.js';
 
@@ -12,6 +14,7 @@ describe('ConversationService Unit Tests', () => {
   let mockConvRepo: Partial<ConversationRepository>;
   let mockUserRepo: Partial<UserRepository>;
   let mockReceiptRepo: Partial<MessageReceiptRepository>;
+  let mockMessageRepo: Partial<MessageRepository>;
   let service: ConversationService;
 
   const userAId = new Types.ObjectId().toString();
@@ -54,10 +57,16 @@ describe('ConversationService Unit Tests', () => {
       getUnreadCount: vi.fn().mockResolvedValue(0),
     };
 
+    mockMessageRepo = {
+      findMessagesByCursor: vi.fn(),
+      findConversationHistory: vi.fn(),
+    };
+
     service = new ConversationService(
       mockConvRepo as ConversationRepository,
       mockUserRepo as UserRepository,
       mockReceiptRepo as MessageReceiptRepository,
+      mockMessageRepo as MessageRepository,
     );
   });
 
@@ -152,7 +161,6 @@ describe('ConversationService Unit Tests', () => {
         mockConversationDoc as unknown as IConversationDoc,
       );
 
-      // Caller userC is not in [userA, userB]
       await expect(service.getConversationById(convId, userCId)).rejects.toThrow(ForbiddenError);
     });
 
@@ -166,6 +174,65 @@ describe('ConversationService Unit Tests', () => {
 
     it('throws BadRequestError on malformed conversation ID format', async () => {
       await expect(service.getConversationById('invalid_conv_id', userAId)).rejects.toThrow(
+        BadRequestError,
+      );
+    });
+  });
+
+  describe('getConversationMessages (Cursor Pagination & Authorization)', () => {
+    it('returns cursor-paginated messages when caller is a participant', async () => {
+      vi.mocked(mockConvRepo.isParticipant!).mockResolvedValue(true);
+
+      const msgId1 = new Types.ObjectId().toString();
+      const msgId2 = new Types.ObjectId().toString();
+      const mockMsgDocs = [
+        {
+          _id: new Types.ObjectId(msgId1),
+          content: 'Hello message 1',
+          toJSON: () => ({ id: msgId1, content: 'Hello message 1' }),
+        },
+        {
+          _id: new Types.ObjectId(msgId2),
+          content: 'Hello message 2',
+          toJSON: () => ({ id: msgId2, content: 'Hello message 2' }),
+        },
+      ];
+
+      vi.mocked(mockMessageRepo.findMessagesByCursor!).mockResolvedValue({
+        messages: mockMsgDocs as unknown as IMessageDoc[],
+        nextCursor: msgId2,
+        prevCursor: msgId1,
+        hasMore: true,
+        limit: 50,
+      });
+
+      const result = await service.getConversationMessages(convId, userAId, {
+        limit: 50,
+        direction: 'before',
+      });
+
+      expect(result.messages.length).toBe(2);
+      expect(result.messages[0]!['content']).toBe('Hello message 1');
+      expect(result.nextCursor).toBe(msgId2);
+      expect(result.hasMore).toBe(true);
+      expect(mockMessageRepo.findMessagesByCursor).toHaveBeenCalledWith(convId, {
+        cursor: undefined,
+        limit: 50,
+        direction: 'before',
+      });
+    });
+
+    it('throws ForbiddenError when non-participant attempts to read messages', async () => {
+      vi.mocked(mockConvRepo.isParticipant!).mockResolvedValue(false);
+
+      await expect(service.getConversationMessages(convId, userCId)).rejects.toThrow(
+        ForbiddenError,
+      );
+      expect(mockMessageRepo.findMessagesByCursor).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestError on malformed conversation ID format', async () => {
+      await expect(service.getConversationMessages('invalid_id', userAId)).rejects.toThrow(
         BadRequestError,
       );
     });

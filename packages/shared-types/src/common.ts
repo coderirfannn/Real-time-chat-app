@@ -23,4 +23,18 @@ export interface PaginationMeta {
   nextCursor?: string;
 }
 
+export interface CursorPaginationParams {
+  cursor?: string;
+  limit?: number;
+  direction?: 'before' | 'after';
+}
+
+export interface CursorPaginatedResult<T> {
+  messages: T[];
+  nextCursor: string | null;
+  prevCursor: string | null;
+  hasMore: boolean;
+  limit: number;
+}
+
 export type Result<T, E = Error> = { success: true; data: T } | { success: false; error: E };
