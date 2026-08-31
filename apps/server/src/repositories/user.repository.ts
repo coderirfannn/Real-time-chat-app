@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import { BaseRepository } from './base.repository.js';
 import { UserModel, type IUserDoc } from '../models/user.model.js';
 import type { UserStatus } from '@chatlock/shared-types';
@@ -38,11 +39,14 @@ export class UserRepository extends BaseRepository<IUserDoc> {
     const filter: Record<string, unknown> = {};
 
     if (excludeUserId) {
-      filter['_id'] = { $ne: excludeUserId };
+      filter['_id'] = Types.ObjectId.isValid(excludeUserId)
+        ? { $ne: new Types.ObjectId(excludeUserId) }
+        : { $ne: excludeUserId };
     }
 
     if (clean) {
-      const regex = new RegExp(clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escaped, 'i');
       filter['$or'] = [{ username: regex }, { displayName: regex }, { email: regex }];
     }
 

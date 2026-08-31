@@ -17,12 +17,7 @@ describe('Settings & Profile Flow Unit Tests', () => {
       status: 'online',
     };
 
-    vi.spyOn(apiClient, 'get').mockResolvedValue({
-      success: true,
-      data: mockUser,
-      message: 'Profile retrieved',
-      timestamp: '2026-08-31T00:00:00Z',
-    });
+    vi.spyOn(apiClient, 'get').mockResolvedValue(mockUser as never);
 
     const user = await userApi.getMe();
     expect(user.displayName).toBe('Alice Liddell');
@@ -38,12 +33,7 @@ describe('Settings & Profile Flow Unit Tests', () => {
       status: 'online',
     };
 
-    vi.spyOn(apiClient, 'patch').mockResolvedValue({
-      success: true,
-      data: updatedUser,
-      message: 'Profile updated',
-      timestamp: '2026-08-31T00:00:00Z',
-    });
+    vi.spyOn(apiClient, 'patch').mockResolvedValue(updatedUser as never);
 
     const res = await userApi.updateProfile({ displayName: 'Alice Wonderland' });
     expect(res.displayName).toBe('Alice Wonderland');
@@ -52,10 +42,26 @@ describe('Settings & Profile Flow Unit Tests', () => {
     });
   });
 
-  it('3. LOGOUT ALL: calls auth logout-all endpoint', async () => {
+  it('3. SEARCH USERS: queries users and returns array of UserProfile', async () => {
+    const mockUsers = [
+      { id: 'user_1', username: 'bob', displayName: 'Bob', status: 'online' },
+      { id: 'user_2', username: 'charlie', displayName: 'Charlie', status: 'offline' },
+    ];
+
+    vi.spyOn(apiClient, 'get').mockResolvedValue(mockUsers as never);
+
+    const users = await userApi.searchUsers('bo');
+    expect(users).toHaveLength(2);
+    expect(users[0]?.username).toBe('bob');
+    expect(apiClient.get).toHaveBeenCalledWith('/users/search', {
+      params: { q: 'bo', limit: 20 },
+    });
+  });
+
+  it('4. LOGOUT ALL: calls auth logout-all endpoint', async () => {
     vi.spyOn(apiClient, 'post').mockResolvedValue({
       message: 'All device sessions revoked successfully',
-    });
+    } as never);
 
     const res = await authApi.logoutAll();
     expect(res.message).toBe('All device sessions revoked successfully');
