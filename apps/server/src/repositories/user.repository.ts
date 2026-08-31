@@ -29,6 +29,26 @@ export class UserRepository extends BaseRepository<IUserDoc> {
       .exec();
   }
 
+  public async searchUsers(
+    query: string,
+    excludeUserId?: string,
+    limit: number = 20,
+  ): Promise<IUserDoc[]> {
+    const clean = query.trim();
+    const filter: Record<string, unknown> = {};
+
+    if (excludeUserId) {
+      filter['_id'] = { $ne: excludeUserId };
+    }
+
+    if (clean) {
+      const regex = new RegExp(clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter['$or'] = [{ username: regex }, { displayName: regex }, { email: regex }];
+    }
+
+    return this.model.find(filter).limit(Math.min(limit, 50)).sort({ displayName: 1 }).exec();
+  }
+
   public async updateStatus(userId: string, status: UserStatus): Promise<IUserDoc | null> {
     return this.updateById(userId, {
       status,

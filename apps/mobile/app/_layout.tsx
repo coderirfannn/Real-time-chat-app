@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { View, ActivityIndicator } from 'react-native';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -18,7 +19,9 @@ const queryClient = new QueryClient({
 });
 
 function AuthLifecycleManager({ children }: { children: React.ReactNode }) {
-  const { accessToken, isAuthenticated, hydrateAuth } = useAuthStore();
+  const { accessToken, isAuthenticated, isLoading, hydrateAuth } = useAuthStore();
+  const segments = useSegments();
+  const router = useRouter();
 
   useAppLifecycle();
 
@@ -27,12 +30,39 @@ function AuthLifecycleManager({ children }: { children: React.ReactNode }) {
   }, [hydrateAuth]);
 
   useEffect(() => {
+    if (isLoading) return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+
+    if (!isAuthenticated && !inAuthGroup) {
+      router.replace('/(auth)/login' as never);
+    } else if (isAuthenticated && inAuthGroup) {
+      router.replace('/(main)' as never);
+    }
+  }, [isAuthenticated, isLoading, segments, router]);
+
+  useEffect(() => {
     if (isAuthenticated && accessToken) {
       socketManager.connect(accessToken);
     } else {
       socketManager.disconnect();
     }
   }, [isAuthenticated, accessToken]);
+
+  if (isLoading) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: '#0F172A',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <ActivityIndicator size="large" color="#38BDF8" />
+      </View>
+    );
+  }
 
   return <>{children}</>;
 }

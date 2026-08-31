@@ -16,9 +16,13 @@ export class ConversationApi {
   }
 
   public async createDirectConversation(
-    input: CreateDirectConversationInput,
+    recipientOrInput: string | CreateDirectConversationInput,
   ): Promise<IConversation> {
-    return apiClient.post<IConversation>('/conversations', input);
+    const payload =
+      typeof recipientOrInput === 'string'
+        ? { recipientId: recipientOrInput, type: 'direct' as const }
+        : recipientOrInput;
+    return apiClient.post<IConversation>('/conversations', payload);
   }
 
   public async getMessages(
