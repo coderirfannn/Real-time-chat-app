@@ -54,10 +54,16 @@ export function initSocketServer(httpServer: HttpServer): TypedSocketServer {
   });
 
   // 1. Configure Redis Adapter for Horizontal Multi-Node Cluster Scaling
-  if (process.env['NODE_ENV'] !== 'test') {
+  if (process.env['NODE_ENV'] !== 'test' && redisManager.isReady()) {
     try {
       const pubClient = redisManager.createDuplicateClient();
       const subClient = redisManager.createDuplicateClient();
+      pubClient.on('error', (err: Error) => {
+        socketServerLogger.warn('Redis pubClient error', { error: err.message });
+      });
+      subClient.on('error', (err: Error) => {
+        socketServerLogger.warn('Redis subClient error', { error: err.message });
+      });
       io.adapter(createAdapter(pubClient, subClient));
       socketServerLogger.info('Socket.IO Redis adapter configured for horizontal cluster scaling');
     } catch (err) {
@@ -65,6 +71,8 @@ export function initSocketServer(httpServer: HttpServer): TypedSocketServer {
         error: (err as Error).message,
       });
     }
+  } else {
+    socketServerLogger.info('Socket.IO running with built-in in-memory adapter');
   }
 
   // 2. Register authentication handshake middleware

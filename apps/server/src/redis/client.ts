@@ -22,11 +22,14 @@ class RedisConnectionManager {
       password: config.redis.password || undefined,
       keyPrefix: config.redis.keyPrefix,
       lazyConnect: true,
-      maxRetriesPerRequest: 3,
+      maxRetriesPerRequest: null,
       enableReadyCheck: true,
       autoResubscribe: true,
       retryStrategy: (times: number) => {
-        const delay = Math.min(times * 200, 3000);
+        if (times > 3) {
+          return null; // Stop retrying to avoid spamming / crashing dev instances without Redis
+        }
+        const delay = Math.min(times * 200, 1000);
         redisLogger.warn(`Redis connection retry attempt #${times} in ${delay}ms`);
         return delay;
       },
