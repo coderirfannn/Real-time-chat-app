@@ -1,11 +1,43 @@
 import type { IMessage } from '@chatlock/shared-types';
-import type { LocalMessage, OutboxMessage } from '../types/chat.types';
+import type { LocalMessage, OutboxMessage, DeliveryStatus } from '../types/chat.types';
 
 export interface ReconcileOptions {
   historyPages?: Array<{ messages?: IMessage[] } | undefined>;
   socketMessages?: LocalMessage[];
   optimisticMessages?: LocalMessage[];
   outboxMessages?: Array<LocalMessage | OutboxMessage>;
+}
+
+const STATUS_RANK: Record<string, number> = {
+  failed: -1,
+  pending: 1,
+  sending: 2,
+  sent: 3,
+  delivered: 4,
+  read: 5,
+};
+
+/**
+ * Resolves the highest delivery status, ensuring monotonic progression
+ * and preventing status downgrades (e.g. read cannot become delivered).
+ */
+export function resolveHighestStatus(
+  statusA?: DeliveryStatus,
+  statusB?: DeliveryStatus,
+): DeliveryStatus {
+  if (!statusA && !statusB) return 'sent';
+  if (!statusA) return statusB!;
+  if (!statusB) return statusA;
+
+  // If one is failed and the other is confirmed sent/delivered/read on server, server wins
+  if (statusA === 'failed' && (STATUS_RANK[statusB] ?? 0) >= 3) return statusB;
+  if (statusB === 'failed' && (STATUS_RANK[statusA] ?? 0) >= 3) return statusA;
+  if (statusA === 'failed' || statusB === 'failed') return 'failed';
+
+  const rankA = STATUS_RANK[statusA] ?? 0;
+  const rankB = STATUS_RANK[statusB] ?? 0;
+
+  return rankA >= rankB ? statusA : statusB;
 }
 
 /**
@@ -49,7 +81,8 @@ export function reconcileChatMessages(options: ReconcileOptions): LocalMessage[]
     if (!existing) {
       messageMap.set(key, msg);
     } else {
-      // Merge properties intelligently
+      // Merge properties with monotonic receipt status progression
+      const mergedStatus = resolveHighestStatus(existing.status, msg.status);
       const merged: LocalMessage = {
         ...existing,
         ...msg,
@@ -59,8 +92,10 @@ export function reconcileChatMessages(options: ReconcileOptions): LocalMessage[]
         retryPayload: msg.retryPayload || existing.retryPayload,
         // If existing had an established server ID, preserve it
         id: msg.id || existing.id,
-        // Status resolution
-        status: msg.status || existing.status || 'delivered',
+        // Monotonic status resolution
+        status: mergedStatus,
+        deliveredAt: msg.deliveredAt || existing.deliveredAt,
+        readAt: msg.readAt || existing.readAt,
       };
       messageMap.set(key, merged);
     }
@@ -73,7 +108,7 @@ export function reconcileChatMessages(options: ReconcileOptions): LocalMessage[]
       const formatted: LocalMessage = {
         ...rawMsg,
         clientMessageId: rawMsg.clientMessageId || `srv_${rawMsg.id}`,
-        status: 'delivered',
+        status: (rawMsg.status as DeliveryStatus) || 'sent',
       };
       upsertMessage(formatted);
     }

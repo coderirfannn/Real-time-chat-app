@@ -55,6 +55,7 @@ describe('ConversationService Unit Tests', () => {
 
     mockReceiptRepo = {
       getUnreadCount: vi.fn().mockResolvedValue(0),
+      getReceiptsForMessages: vi.fn().mockResolvedValue([]),
     };
 
     mockMessageRepo = {

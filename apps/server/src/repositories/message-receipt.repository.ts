@@ -8,6 +8,11 @@ export class MessageReceiptRepository extends BaseRepository<IMessageReceiptDoc>
     super(MessageReceiptModel);
   }
 
+  /**
+   * Upserts a message receipt ensuring monotonic state progression:
+   * 'sent' -> 'delivered' -> 'read'.
+   * Never downgrades a 'read' receipt back to 'delivered'.
+   */
   public async upsertReceipt(data: {
     messageId: string | Types.ObjectId;
     conversationId: string | Types.ObjectId;
@@ -18,6 +23,20 @@ export class MessageReceiptRepository extends BaseRepository<IMessageReceiptDoc>
     const userObj = new Types.ObjectId(data.userId);
     const convObj = new Types.ObjectId(data.conversationId);
     const now = new Date();
+
+    // Prevent downgrade from 'read' to 'delivered'
+    if (data.status === 'delivered') {
+      const existing = await this.model.findOne({ messageId: msgObj, userId: userObj }).exec();
+      if (existing) {
+        if (existing.status === 'read') {
+          if (!existing.deliveredAt) {
+            existing.deliveredAt = now;
+            await existing.save();
+          }
+          return existing;
+        }
+      }
+    }
 
     const updateFields: Record<string, unknown> = {
       status: data.status,
@@ -43,12 +62,51 @@ export class MessageReceiptRepository extends BaseRepository<IMessageReceiptDoc>
       .exec();
   }
 
+  /**
+   * Batch upserts receipts for multiple messages in a conversation.
+   */
+  public async batchUpsertReceipts(data: {
+    messageIds: Array<string | Types.ObjectId>;
+    conversationId: string | Types.ObjectId;
+    userId: string | Types.ObjectId;
+    status: ReceiptStatus;
+  }): Promise<IMessageReceiptDoc[]> {
+    const results: IMessageReceiptDoc[] = [];
+    for (const msgId of data.messageIds) {
+      const doc = await this.upsertReceipt({
+        messageId: msgId,
+        conversationId: data.conversationId,
+        userId: data.userId,
+        status: data.status,
+      });
+      if (doc) results.push(doc);
+    }
+    return results;
+  }
+
+  /**
+   * Retrieves all receipts for a given message.
+   */
   public async findReceiptsForMessage(
     messageId: string | Types.ObjectId,
   ): Promise<IMessageReceiptDoc[]> {
     return this.find({ messageId: new Types.ObjectId(messageId) });
   }
 
+  /**
+   * Retrieves receipts for multiple message IDs.
+   */
+  public async getReceiptsForMessages(
+    messageIds: Array<string | Types.ObjectId>,
+  ): Promise<IMessageReceiptDoc[]> {
+    if (messageIds.length === 0) return [];
+    const objectIds = messageIds.map((id) => new Types.ObjectId(id));
+    return this.model.find({ messageId: { $in: objectIds } }).exec();
+  }
+
+  /**
+   * Counts unread messages for a user in a conversation.
+   */
   public async getUnreadCount(
     conversationId: string | Types.ObjectId,
     userId: string | Types.ObjectId,
@@ -60,6 +118,9 @@ export class MessageReceiptRepository extends BaseRepository<IMessageReceiptDoc>
     });
   }
 
+  /**
+   * Marks all messages in a conversation as read for a given user.
+   */
   public async markConversationAsRead(
     conversationId: string | Types.ObjectId,
     userId: string | Types.ObjectId,

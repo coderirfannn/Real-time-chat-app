@@ -3,6 +3,7 @@ import { registerConnectionEvents } from './connection.events.js';
 import { registerMessageEvents } from './message.events.js';
 import { registerPresenceEvents } from './presence.events.js';
 import { registerTypingEvents } from './typing.events.js';
+import { registerReceiptEvents } from './receipt.events.js';
 import type { AuthenticatedSocket } from '../middleware/auth.socket.middleware.js';
 import type { TypedSocketServer } from '../index.js';
 
@@ -24,6 +25,9 @@ export function registerSocketEvents(socket: AuthenticatedSocket, io: TypedSocke
 
   // 5. Real-time messaging events
   registerMessageEvents(socket, io);
+
+  // 6. Delivery and read receipt events
+  registerReceiptEvents(socket, io);
 }
 
 export * from './room.events.js';
@@ -31,3 +35,4 @@ export * from './connection.events.js';
 export * from './message.events.js';
 export * from './presence.events.js';
 export * from './typing.events.js';
+export * from './receipt.events.js';

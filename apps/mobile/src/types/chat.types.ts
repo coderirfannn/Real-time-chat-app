@@ -16,6 +16,8 @@ export interface OutboxMessage {
   type?: MessageType;
   attachments?: MessageAttachment[];
   status: DeliveryStatus;
+  deliveredAt?: string | null;
+  readAt?: string | null;
   createdAt: string;
   updatedAt: string;
   attempts: number;
@@ -39,6 +41,8 @@ export interface LocalMessage {
   content: string;
   attachments?: MessageAttachment[];
   status: DeliveryStatus;
+  deliveredAt?: string | null;
+  readAt?: string | null;
   reactions?: MessageReaction[];
   replyToMessageId?: string;
   editedAt?: string | null;

@@ -1,8 +1,8 @@
 # BRAIN.md — ChatLock Platform Architecture & System Design
 
 **Project**: ChatLock — Production-Grade Real-Time Messaging Platform  
-**Version**: 0.13.0 (Task 13 — Production Mobile Experience & Full Backend Integration)  
-**Status**: Production-Grade End-to-End Mobile & Server Architecture Established
+**Version**: 0.14.0 (Task 13 — Delivery and Read Receipts Completed)  
+**Status**: Production-Grade End-to-End Real-Time Receipts Subsystem Established
 
 ---
 
@@ -19,7 +19,8 @@ ChatLock is a secure, high-concurrency, real-time messaging platform built for c
 5. **Resilient Real-Time Event Pipeline**: Horizontal scaling with Redis Streams/Pub-Sub adapters for multi-node Socket.IO deployments.
 6. **Offline-First Reliability**: Persistent outbox storage, exponential backoff retries with jitter, idempotency deduplication (`clientMessageId`), and lifecycle foreground reconciliation.
 7. **Ephemeral Presence & Typing**: Zero database write heartbeats via Redis 60s TTL keys, durable `lastSeenAt` MongoDB persistence on disconnect, and ephemeral room-scoped typing indicators with auto-expiration.
-8. **Defense in Depth**: Zero-trust token rotation, rate limiting, helmet security headers, request ID correlation, and structured logging.
+8. **Monotonic Delivery & Read Receipts**: Strict unidirectional progression ($\text{sent} \to \text{delivered} \to \text{read}$), durable persistence in MongoDB `MessageReceipt`, multi-device synchronization, and duplicate-safe idempotent updates.
+9. **Defense in Depth**: Zero-trust token rotation, rate limiting, helmet security headers, request ID correlation, and structured logging.
 
 ---
 
@@ -36,15 +37,15 @@ ChatLock/
 │   │   │   ├── services/   # ApiClient, SocketManager, OutboxService, RetryEngine
 │   │   │   ├── store/      # Zustand auth & client state stores
 │   │   │   └── utils/      # Message reconciler, grouper, date formatters
-│   │   └── __tests__/      # Vitest test suites (auth, chat, offline, presence)
+│   │   └── __tests__/      # Vitest test suites (auth, chat, offline, presence, receipts)
 │   │
 │   └── server/             # Node.js + Express + Socket.IO backend service
 │       ├── controllers/    # HTTP request/response handlers (Auth, Conv, User, Health)
-│       ├── services/       # Domain business logic (Auth, Conversation, Message, Presence)
-│       ├── repositories/   # Decoupled persistence access layer (User, Conv, Message)
+│       ├── services/       # Domain business logic (Auth, Conversation, Message, Presence, Receipt)
+│       ├── repositories/   # Decoupled persistence access layer (User, Conv, Message, MessageReceipt)
 │       ├── database/       # MongoDB connection lifecycle management
 │       ├── redis/          # Redis connection lifecycle management
-│       ├── socket/         # Socket.IO gateway, connection, room, messaging, typing, presence
+│       ├── socket/         # Socket.IO gateway, connection, room, messaging, typing, presence, receipts
 │       ├── middleware/     # Security, Request ID, logging, validation, error handlers
 │       ├── errors/         # Stable error codes and AppError hierarchy
 │       └── utils/          # Structured logger, JWT tokens, async handler
@@ -123,7 +124,7 @@ The environment system strictly validates 13 distinct categories in `@chatlock/c
 - [x] **Task 10 — Message Synchronization**: Cursor-paginated message history synchronization (`GET /api/v1/conversations/:id/messages` with `before`/`after` cursors and `limit`), reverse virtualization list prepending, client reconciliation across network and Socket.IO races (`serverMessageId` and `clientMessageId` deduping).
 - [x] **Task 11 — Offline-First Reliability**: Resilient message delivery across network drops (`online`, `offline`, `connecting`, `reconnecting`), persistent encrypted local outbox queue (`chatlock_persistent_outbox_v1`), controlled exponential backoff retry engine with jitter & max 5 retry cap, error classification (retryable vs non-retryable), and app lifecycle foreground/background restoration.
 - [x] **Task 12 — Presence & Typing Indicators**: Redis ephemeral presence tracking (`presence:{userId}` key with 60s TTL), 25s client heartbeat loop refreshing TTL with zero database write overhead, durable MongoDB `lastSeenAt` & offline status update on connection disconnect, real-time typing indicators (`typing:start`, `typing:stop`) with 3s composer debounce and 4s auto-expiration.
-- [x] **Task 13 — Production Mobile Experience & Backend Integration**: Full production auth pages (`login.tsx`, `register.tsx`), global auth route guard with splash hydration in `_layout.tsx`, user search and contact discovery API (`GET /api/v1/users/search?q=...` & `GET /api/v1/users/:id`), New Chat search modal, and direct conversation initiation.
+- [x] **Task 13 — Delivery and Read Receipts**: Full monotonic receipt lifecycle ($\text{sent} \to \text{delivered} \to \text{read}$), real-time `message:delivered` and `message:read` Socket.IO events, durable `MessageReceipt` MongoDB persistence, multi-device synchronization, client automatic receipt dispatch on receive/read, and UI status indicator rendering (✓, ✓✓ grey, ✓✓ cyan).
 - [ ] **Task 14 — Media & File Attachments**: Secure multi-part uploads, thumbnail generation, S3/local storage abstraction, progress tracking, and media message bubbles.
 - [ ] **Task 15 — Push Notifications**: FCM & APNs integration, background delivery tokens in `Device` collection, notification badges, and offline payload delivery.
 - [ ] **Task 16 — Security & End-to-End Encryption (E2EE)**: Pre-key bundles, Signal Protocol / Double Ratchet session management, encrypted payloads, and cryptographic audit.

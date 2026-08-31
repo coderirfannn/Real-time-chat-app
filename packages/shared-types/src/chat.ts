@@ -33,6 +33,8 @@ export interface IMessage extends Timestamps {
   content: string;
   attachments?: MessageAttachment[];
   status: MessageDeliveryStatus;
+  deliveredAt?: string | null;
+  readAt?: string | null;
   reactions?: MessageReaction[];
   replyToMessageId?: ID;
   editedAt?: string | null;

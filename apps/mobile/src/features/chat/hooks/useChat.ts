@@ -214,16 +214,31 @@ export function useChat(conversationId: string): UseChatReturn {
     };
   }, [conversationId, currentUserId, recipient.id]);
 
-  // 8. Socket Listeners: onNewMessage & onMessageSent with cache reconciliation
+  // 8. Auto-mark conversation as read on initial history load or room focus
+  useEffect(() => {
+    if (!conversationId || socketConnectionState !== 'connected') return;
+
+    // Send read receipt for all unread incoming messages in this conversation
+    socketManager.sendReadReceipt(conversationId);
+  }, [conversationId, socketConnectionState, infiniteHistory?.pages]);
+
+  // 9. Socket Listeners: onNewMessage, onMessageSent, onMessageDelivered, onMessageRead
   useEffect(() => {
     const unsubNew = socketManager.onNewMessage((newMsg: IMessage) => {
       if (newMsg.conversationId !== conversationId) return;
 
+      const isIncoming = newMsg.senderId !== currentUserId;
       const formattedMsg: LocalMessage = {
         ...newMsg,
         clientMessageId: newMsg.clientMessageId || `srv_${newMsg.id}`,
-        status: 'delivered',
+        status: isIncoming ? 'read' : (newMsg.status as LocalMessage['status']) || 'delivered',
       };
+
+      // Automatically dispatch delivery & read receipts for incoming messages
+      if (isIncoming && newMsg.id) {
+        socketManager.sendDeliveryReceipt(conversationId, newMsg.id);
+        socketManager.sendReadReceipt(conversationId, newMsg.id);
+      }
 
       setSocketMessages((prev) => {
         const exists = prev.some(
@@ -246,7 +261,7 @@ export function useChat(conversationId: string): UseChatReturn {
       });
 
       // Clear typing indicator when message arrives from peer
-      if (newMsg.senderId !== currentUserId) {
+      if (isIncoming) {
         setIsPeerTyping(false);
       }
 
@@ -273,9 +288,55 @@ export function useChat(conversationId: string): UseChatReturn {
       outboxService.dequeue(ack.clientMessageId).catch(() => {});
     });
 
+    const unsubDelivered = socketManager.onMessageDelivered((payload) => {
+      if (payload.conversationId !== conversationId) return;
+
+      setSocketMessages((prev) =>
+        prev.map((msg) => {
+          const match =
+            (payload.messageId && msg.id === payload.messageId) ||
+            (payload.messageIds && msg.id && payload.messageIds.includes(msg.id));
+
+          if (match && msg.status !== 'read') {
+            return {
+              ...msg,
+              status: 'delivered',
+              deliveredAt: payload.deliveredAt || msg.deliveredAt,
+            };
+          }
+          return msg;
+        }),
+      );
+    });
+
+    const unsubRead = socketManager.onMessageRead((payload) => {
+      if (payload.conversationId !== conversationId) return;
+
+      setSocketMessages((prev) =>
+        prev.map((msg) => {
+          const match =
+            !payload.messageId && !payload.messageIds
+              ? true // Entire conversation marked read
+              : (payload.messageId && msg.id === payload.messageId) ||
+                (payload.messageIds && msg.id && payload.messageIds.includes(msg.id));
+
+          if (match) {
+            return {
+              ...msg,
+              status: 'read',
+              readAt: payload.readAt || msg.readAt,
+            };
+          }
+          return msg;
+        }),
+      );
+    });
+
     return () => {
       unsubNew();
       unsubSent();
+      unsubDelivered();
+      unsubRead();
     };
   }, [conversationId, queryClient, currentUserId]);
 

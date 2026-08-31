@@ -169,6 +169,52 @@ export class SocketManager {
     return socketService.onMessageSent(listener);
   }
 
+  /**
+   * Sends delivery receipt for one or more messages.
+   */
+  public sendDeliveryReceipt(conversationId: string, messageIdOrIds: string | string[]): void {
+    socketService.sendDeliveryReceipt(conversationId, messageIdOrIds);
+  }
+
+  /**
+   * Sends read receipt for one, multiple, or all messages in a conversation.
+   */
+  public sendReadReceipt(conversationId: string, messageIdOrIds?: string | string[]): void {
+    socketService.sendReadReceipt(conversationId, messageIdOrIds);
+  }
+
+  /**
+   * Registers callback for message:delivered events.
+   */
+  public onMessageDelivered(
+    listener: (payload: {
+      conversationId: string;
+      messageId?: string;
+      messageIds?: string[];
+      userId: string;
+      status: 'delivered';
+      deliveredAt?: string;
+    }) => void,
+  ): () => void {
+    return socketService.onMessageDelivered(listener);
+  }
+
+  /**
+   * Registers callback for message:read events.
+   */
+  public onMessageRead(
+    listener: (payload: {
+      conversationId: string;
+      messageId?: string;
+      messageIds?: string[];
+      userId: string;
+      status: 'read';
+      readAt?: string;
+    }) => void,
+  ): () => void {
+    return socketService.onMessageRead(listener);
+  }
+
   public isConnected(): boolean {
     return socketService.isConnected();
   }

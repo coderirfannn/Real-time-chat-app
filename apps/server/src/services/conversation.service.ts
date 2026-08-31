@@ -195,8 +195,47 @@ export class ConversationService {
       direction: options.direction || 'before',
     });
 
+    const messageIds = result.messages.map((doc) => doc._id.toString());
+    const receipts = await this.receiptRepo.getReceiptsForMessages(messageIds);
+
+    const receiptMap = new Map<
+      string,
+      Array<{ status: string; deliveredAt?: Date | null; readAt?: Date | null }>
+    >();
+    receipts.forEach((r) => {
+      const msgIdStr = r.messageId.toString();
+      if (!receiptMap.has(msgIdStr)) receiptMap.set(msgIdStr, []);
+      receiptMap.get(msgIdStr)!.push(r);
+    });
+
+    const decoratedMessages = result.messages.map((doc) => {
+      const json = doc.toJSON() as Record<string, unknown>;
+      const msgReceipts = receiptMap.get(doc._id.toString()) || [];
+
+      let deliveryStatus = 'sent';
+      let deliveredAt: string | undefined = undefined;
+      let readAt: string | undefined = undefined;
+
+      if (msgReceipts.some((r) => r.status === 'read')) {
+        deliveryStatus = 'read';
+        const readR = msgReceipts.find((r) => r.status === 'read' && r.readAt);
+        readAt = readR?.readAt?.toISOString();
+        deliveredAt = readR?.deliveredAt?.toISOString();
+      } else if (msgReceipts.some((r) => r.status === 'delivered')) {
+        deliveryStatus = 'delivered';
+        const delivR = msgReceipts.find((r) => r.status === 'delivered' && r.deliveredAt);
+        deliveredAt = delivR?.deliveredAt?.toISOString();
+      }
+
+      json['status'] = deliveryStatus;
+      json['deliveredAt'] = deliveredAt;
+      json['readAt'] = readAt;
+
+      return json;
+    });
+
     return {
-      messages: result.messages.map((doc) => doc.toJSON()),
+      messages: decoratedMessages,
       nextCursor: result.nextCursor,
       prevCursor: result.prevCursor,
       hasMore: result.hasMore,

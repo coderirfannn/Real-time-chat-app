@@ -236,6 +236,94 @@ export class SocketService {
   }
 
   /**
+   * Sends delivery receipt for one or more messages.
+   */
+  public sendDeliveryReceipt(conversationId: string, messageIdOrIds: string | string[]): void {
+    const socket = this.getSocket();
+    if (!socket.connected) return;
+
+    if (Array.isArray(messageIdOrIds)) {
+      socket.emit(SocketEvents.MESSAGE_DELIVERED, {
+        conversationId,
+        messageIds: messageIdOrIds,
+      });
+    } else {
+      socket.emit(SocketEvents.MESSAGE_DELIVERED, {
+        conversationId,
+        messageId: messageIdOrIds,
+      });
+    }
+  }
+
+  /**
+   * Sends read receipt for one, multiple, or all messages in a conversation.
+   */
+  public sendReadReceipt(conversationId: string, messageIdOrIds?: string | string[]): void {
+    const socket = this.getSocket();
+    if (!socket.connected) return;
+
+    if (Array.isArray(messageIdOrIds)) {
+      socket.emit(SocketEvents.MESSAGE_READ, {
+        conversationId,
+        messageIds: messageIdOrIds,
+      });
+    } else if (typeof messageIdOrIds === 'string') {
+      socket.emit(SocketEvents.MESSAGE_READ, {
+        conversationId,
+        messageId: messageIdOrIds,
+      });
+    } else {
+      socket.emit(SocketEvents.MESSAGE_READ, {
+        conversationId,
+      });
+    }
+  }
+
+  /**
+   * Registers callback for message:delivered events.
+   */
+  public onMessageDelivered(
+    listener: (payload: {
+      conversationId: string;
+      messageId?: string;
+      messageIds?: string[];
+      userId: string;
+      status: 'delivered';
+      deliveredAt?: string;
+    }) => void,
+  ): () => void {
+    const socket = this.getSocket();
+    socket.on(SocketEvents.MESSAGE_DELIVERED, listener as never);
+    socket.on(SocketEvents.MESSAGE_DELIVERED_LEGACY, listener as never);
+    return () => {
+      socket.off(SocketEvents.MESSAGE_DELIVERED, listener as never);
+      socket.off(SocketEvents.MESSAGE_DELIVERED_LEGACY, listener as never);
+    };
+  }
+
+  /**
+   * Registers callback for message:read events.
+   */
+  public onMessageRead(
+    listener: (payload: {
+      conversationId: string;
+      messageId?: string;
+      messageIds?: string[];
+      userId: string;
+      status: 'read';
+      readAt?: string;
+    }) => void,
+  ): () => void {
+    const socket = this.getSocket();
+    socket.on(SocketEvents.MESSAGE_READ, listener as never);
+    socket.on(SocketEvents.MESSAGE_READ_LEGACY, listener as never);
+    return () => {
+      socket.off(SocketEvents.MESSAGE_READ, listener as never);
+      socket.off(SocketEvents.MESSAGE_READ_LEGACY, listener as never);
+    };
+  }
+
+  /**
    * Checks if socket is currently connected.
    */
   public isConnected(): boolean {
