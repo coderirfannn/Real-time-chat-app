@@ -268,9 +268,13 @@ export function useChat(conversationId: string): UseChatReturn {
       }
 
       // Update global conversations query cache
-      queryClient.setQueryData<IConversation[]>(['conversations'], (oldConvs) => {
-        if (!oldConvs) return oldConvs;
-        return oldConvs.map((c) => {
+      queryClient.setQueryData(['conversations'], (oldData: unknown) => {
+        if (!oldData) return oldData;
+        const list = Array.isArray(oldData)
+          ? oldData
+          : (oldData as { docs?: IConversation[] }).docs || [];
+
+        const updated = list.map((c: IConversation) => {
           if (c.id === conversationId) {
             return {
               ...c,
@@ -280,6 +284,8 @@ export function useChat(conversationId: string): UseChatReturn {
           }
           return c;
         });
+
+        return Array.isArray(oldData) ? updated : { ...(oldData as object), docs: updated };
       });
     });
 

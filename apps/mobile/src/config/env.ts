@@ -21,8 +21,10 @@ function resolveDevUrl(rawUrl: string | undefined, defaultPath: string): string 
   return url;
 }
 
-const rawApiUrl = expoExtra.apiUrl || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
-const rawSocketUrl = expoExtra.socketUrl || process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:5000';
+const rawApiUrl =
+  expoExtra.apiUrl || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+const rawSocketUrl =
+  expoExtra.socketUrl || process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:5000';
 
 export const mobileConfig: MobileConfig = parseAndValidateMobileEnv({
   EXPO_PUBLIC_API_URL: resolveDevUrl(rawApiUrl, 'http://localhost:5000/api/v1'),
