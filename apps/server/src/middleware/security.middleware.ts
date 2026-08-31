@@ -1,6 +1,7 @@
 import helmet from 'helmet';
 import cors from 'cors';
 import express, { type RequestHandler } from 'express';
+import { sanitizeMiddleware } from './sanitize.middleware.js';
 import { config } from '../config/index.js';
 
 export function createSecurityMiddlewares(): RequestHandler[] {
@@ -29,6 +30,7 @@ export function createSecurityMiddlewares(): RequestHandler[] {
 
   middlewares.push(express.json({ limit: '10mb' }));
   middlewares.push(express.urlencoded({ extended: true, limit: '10mb' }));
+  middlewares.push(sanitizeMiddleware);
 
   return middlewares;
 }

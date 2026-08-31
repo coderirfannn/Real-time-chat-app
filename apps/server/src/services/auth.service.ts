@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import { loadServerConfig } from '@chatlock/config';
 import type { RegisterInput, LoginInput } from '@chatlock/validation';
 import type { AuthResponse, UserProfile } from '@chatlock/shared-types';
@@ -11,7 +12,18 @@ import {
   signAccessToken,
   calculateFutureDate,
 } from '../utils/token.js';
-import { ConflictError, UnauthorizedError, NotFoundError } from '../errors/app-error.js';
+import {
+  ConflictError,
+  UnauthorizedError,
+  NotFoundError,
+  BadRequestError,
+} from '../errors/app-error.js';
+import { logger } from '../utils/logger.js';
+
+const authLogger = logger.child('AuthService');
+
+// Precomputed dummy hash for constant-time comparison on nonexistent users (timing attack mitigation)
+const DUMMY_HASH = '$2b$12$e8Y/3W7fJ8qG1Fj1uRzYmO9kR9lP5xO1hG7tK9vL3mQ1aB3cE5g2y';
 
 export class AuthService {
   constructor(
@@ -85,6 +97,8 @@ export class AuthService {
       username: user.username,
     });
 
+    authLogger.info('User registered successfully', { userId, username: cleanUsername });
+
     return {
       user: user.toJSON() as unknown as UserProfile,
       tokens: {
@@ -97,7 +111,7 @@ export class AuthService {
   }
 
   /**
-   * Authenticates user credentials and provisions an active session.
+   * Authenticates user credentials with timing-safe comparison and provisions an active session.
    */
   public async login(input: LoginInput): Promise<AuthResponse> {
     const config = loadServerConfig();
@@ -106,6 +120,8 @@ export class AuthService {
     // 1. Find user with passwordHash
     const user = await this.userRepo.findByIdentifierWithPassword(identifier);
     if (!user) {
+      // Perform constant-time dummy verification to eliminate timing oracle vulnerabilities
+      await verifyPassword(input.password, DUMMY_HASH);
       throw new UnauthorizedError('Invalid email/username or password');
     }
 
@@ -150,6 +166,8 @@ export class AuthService {
       username: user.username,
     });
 
+    authLogger.info('User logged in successfully', { userId, deviceId });
+
     return {
       user: user.toJSON() as unknown as UserProfile,
       tokens: {
@@ -162,7 +180,9 @@ export class AuthService {
   }
 
   /**
-   * Rotates a refresh token: revokes the old session and generates a fresh token pair.
+   * Rotates a refresh token with strict reuse detection:
+   * If a revoked/stale token is presented, all active sessions for that user account
+   * are immediately revoked to protect against token theft.
    */
   public async refreshToken(refreshToken: string): Promise<AuthResponse> {
     const config = loadServerConfig();
@@ -171,6 +191,26 @@ export class AuthService {
     // 1. Locate active session by token hash
     const session = await this.sessionRepo.findByTokenHash(tokenHash);
     if (!session) {
+      // Check if this token belonged to an already revoked session (Token Reuse Detection)
+      const staleSession = await this.sessionRepo.findAnyByTokenHash(tokenHash);
+      if (staleSession) {
+        const victimUserId = staleSession.userId.toString();
+        authLogger.warn(
+          'Security Alert: Refresh token reuse detected! Revoking all sessions for user',
+          {
+            userId: victimUserId,
+            tokenHash,
+          },
+        );
+
+        // Revoke all active sessions for this victim account immediately
+        await this.sessionRepo.revokeAllUserSessions(victimUserId);
+
+        throw new UnauthorizedError(
+          'Security alert: Token reuse detected. All active sessions have been revoked for your safety. Please log in again.',
+        );
+      }
+
       throw new UnauthorizedError('Invalid, expired, or revoked refresh token');
     }
 
@@ -204,6 +244,8 @@ export class AuthService {
       username: user.username,
     });
 
+    authLogger.debug('Session rotated successfully', { userId, deviceId: session.deviceId });
+
     return {
       user: user.toJSON() as unknown as UserProfile,
       tokens: {
@@ -234,6 +276,7 @@ export class AuthService {
   public async logoutAll(userId: string): Promise<{ revokedSessionsCount: number }> {
     const count = await this.sessionRepo.revokeAllUserSessions(userId);
     await this.userRepo.updateStatus(userId, 'offline');
+    authLogger.info('All sessions revoked for user', { userId, revokedSessionsCount: count });
     return { revokedSessionsCount: count };
   }
 
@@ -246,6 +289,42 @@ export class AuthService {
       throw new NotFoundError('User not found');
     }
     return user.toJSON() as unknown as UserProfile;
+  }
+
+  /**
+   * Updates user profile (displayName, avatarUrl, bio).
+   */
+  public async updateProfile(
+    userId: string,
+    data: { displayName?: string; avatarUrl?: string | null; bio?: string },
+  ): Promise<UserProfile> {
+    const cleanUserId = userId.trim();
+    if (!Types.ObjectId.isValid(cleanUserId)) {
+      throw new BadRequestError('Invalid user ID format');
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (data.displayName !== undefined) {
+      const cleanName = data.displayName.trim();
+      if (!cleanName) {
+        throw new BadRequestError('Display name cannot be empty');
+      }
+      updates['displayName'] = cleanName;
+    }
+    if (data.avatarUrl !== undefined) {
+      updates['avatarUrl'] = data.avatarUrl ? data.avatarUrl.trim() : null;
+    }
+    if (data.bio !== undefined) {
+      updates['bio'] = data.bio ? data.bio.trim() : '';
+    }
+
+    const updated = await this.userRepo.updateById(cleanUserId, updates);
+    if (!updated) {
+      throw new NotFoundError('User not found');
+    }
+
+    authLogger.info('User profile updated', { userId: cleanUserId });
+    return updated.toJSON() as unknown as UserProfile;
   }
 }
 

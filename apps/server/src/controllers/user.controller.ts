@@ -1,15 +1,50 @@
 import type { Request, Response } from 'express';
 import type { ApiResponse, UserProfile } from '@chatlock/shared-types';
-import type { UserSearchQueryInput } from '@chatlock/validation';
+import type { UserSearchQueryInput, UpdateProfileInput } from '@chatlock/validation';
 import { userRepository, type UserRepository } from '../repositories/user.repository.js';
+import { authService, type AuthService } from '../services/auth.service.js';
 import { presenceService, type PresenceService } from '../services/presence.service.js';
 import { UnauthorizedError, NotFoundError } from '../errors/app-error.js';
 
 export class UserController {
   constructor(
     private readonly userRepo: UserRepository = userRepository,
+    private readonly auth: AuthService = authService,
     private readonly presence: PresenceService = presenceService,
   ) {}
+
+  public getMe = async (req: Request, res: Response<ApiResponse<UserProfile>>): Promise<void> => {
+    if (!req.user) {
+      throw new UnauthorizedError('Authentication required');
+    }
+
+    const user = await this.auth.getCurrentUser(req.user.id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile retrieved successfully',
+      data: user,
+      timestamp: new Date().toISOString(),
+    });
+  };
+
+  public updateMe = async (
+    req: Request<unknown, unknown, UpdateProfileInput>,
+    res: Response<ApiResponse<UserProfile>>,
+  ): Promise<void> => {
+    if (!req.user) {
+      throw new UnauthorizedError('Authentication required');
+    }
+
+    const updated = await this.auth.updateProfile(req.user.id, req.body);
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: updated,
+      timestamp: new Date().toISOString(),
+    });
+  };
 
   public searchUsers = async (
     req: Request<unknown, unknown, unknown, UserSearchQueryInput>,

@@ -1,8 +1,8 @@
 # BRAIN.md — ChatLock Platform Architecture & System Design
 
 **Project**: ChatLock — Production-Grade Real-Time Messaging Platform  
-**Version**: 0.14.0 (Task 13 — Delivery and Read Receipts Completed)  
-**Status**: Production-Grade End-to-End Real-Time Receipts Subsystem Established
+**Version**: 0.15.0 (Production Industry-Grade Hardening & Security Fortification Completed)  
+**Status**: Production Industry-Grade Architecture, Zero-Trust Security, and Multi-Node Cluster Ready
 
 ---
 
@@ -16,11 +16,13 @@ ChatLock is a secure, high-concurrency, real-time messaging platform built for c
 2. **Layered Backend Decoupling**: Unidirectional request flow (`controller -> service -> repository -> database`) preventing route pollution.
 3. **Type Safety & Schema Integrity**: End-to-end TypeScript strict mode, Zod runtime validation, and shared contract types.
 4. **Secret Isolation**: Guaranteed separation preventing backend credentials or private tokens from leaking into client bundles (`EXPO_PUBLIC_` filtering).
-5. **Resilient Real-Time Event Pipeline**: Horizontal scaling with Redis Streams/Pub-Sub adapters for multi-node Socket.IO deployments.
-6. **Offline-First Reliability**: Persistent outbox storage, exponential backoff retries with jitter, idempotency deduplication (`clientMessageId`), and lifecycle foreground reconciliation.
-7. **Ephemeral Presence & Typing**: Zero database write heartbeats via Redis 60s TTL keys, durable `lastSeenAt` MongoDB persistence on disconnect, and ephemeral room-scoped typing indicators with auto-expiration.
-8. **Monotonic Delivery & Read Receipts**: Strict unidirectional progression ($\text{sent} \to \text{delivered} \to \text{read}$), durable persistence in MongoDB `MessageReceipt`, multi-device synchronization, and duplicate-safe idempotent updates.
-9. **Defense in Depth**: Zero-trust token rotation, rate limiting, helmet security headers, request ID correlation, and structured logging.
+5. **Horizontal Multi-Node Scaling**: Socket.IO `@socket.io/redis-adapter` for distributed cross-node message and presence broadcasting.
+6. **Zero-Trust Security & NoSQL Sanitization**: Global operator stripping (`$` and `.`) on all inputs, constant-time timing-attack mitigation on login, and sliding-window rate limiting on socket duplex events.
+7. **Token Reuse Detection & Family Revocation**: OAuth2 RFC 6819 refresh token rotation with automatic theft detection and full user session invalidation.
+8. **Offline-First Reliability**: Persistent outbox storage, exponential backoff retries with jitter, idempotency deduplication (`clientMessageId`), and lifecycle foreground reconciliation.
+9. **Ephemeral Presence & Typing**: Zero database write heartbeats via Redis 60s TTL keys, durable `lastSeenAt` MongoDB persistence on disconnect, and ephemeral room-scoped typing indicators with auto-expiration.
+10. **Monotonic Delivery & Read Receipts**: Strict unidirectional progression ($\text{sent} \to \text{delivered} \to \text{read}$), durable persistence in MongoDB `MessageReceipt`, multi-device synchronization, and duplicate-safe idempotent updates.
+11. **Live Global Sync & Workflow Polish**: Live conversation list updates across all chats, instant search filter, and User Profile & Security Settings management.
 
 ---
 
@@ -30,23 +32,23 @@ ChatLock is a secure, high-concurrency, real-time messaging platform built for c
 ChatLock/
 ├── apps/
 │   ├── mobile/             # React Native (Expo SDK 54) cross-platform client
-│   │   ├── app/            # Expo Router file-based routing ((auth), (main), chat/[id])
+│   │   ├── app/            # Expo Router file-based routing ((auth), (main), chat/[id], settings)
 │   │   ├── src/
 │   │   │   ├── components/ # Reusable UI components (Avatar, Badge, Banner, EmptyState)
 │   │   │   ├── features/   # Domain features (chat, message list, bubble, composer)
 │   │   │   ├── services/   # ApiClient, SocketManager, OutboxService, RetryEngine
 │   │   │   ├── store/      # Zustand auth & client state stores
 │   │   │   └── utils/      # Message reconciler, grouper, date formatters
-│   │   └── __tests__/      # Vitest test suites (auth, chat, offline, presence, receipts)
+│   │   └── __tests__/      # Vitest test suites (auth, chat, offline, presence, receipts, settings)
 │   │
 │   └── server/             # Node.js + Express + Socket.IO backend service
 │       ├── controllers/    # HTTP request/response handlers (Auth, Conv, User, Health)
 │       ├── services/       # Domain business logic (Auth, Conversation, Message, Presence, Receipt)
-│       ├── repositories/   # Decoupled persistence access layer (User, Conv, Message, MessageReceipt)
+│       ├── repositories/   # Decoupled persistence access layer (User, Conv, Message, MessageReceipt, Session, Device)
 │       ├── database/       # MongoDB connection lifecycle management
 │       ├── redis/          # Redis connection lifecycle management
-│       ├── socket/         # Socket.IO gateway, connection, room, messaging, typing, presence, receipts
-│       ├── middleware/     # Security, Request ID, logging, validation, error handlers
+│       ├── socket/         # Socket.IO gateway, connection, room, messaging, typing, presence, receipts, rate limiter
+│       ├── middleware/     # Security, Request ID, sanitize, logging, validation, error handlers
 │       ├── errors/         # Stable error codes and AppError hierarchy
 │       └── utils/          # Structured logger, JWT tokens, async handler
 │
@@ -78,7 +80,7 @@ ChatLock/
 | **Monorepo Manager**  | pnpm 11+ Workspaces               | Dependency isolation, workspace linking, fast caching  |
 | **Language**          | TypeScript 5.7+                   | Strict static typing across all apps and packages      |
 | **Backend Engine**    | Node.js 20+ / Express 4.21+       | REST API gateway, layered routing, structured logging  |
-| **Real-Time Gateway** | Socket.IO 4.8+                    | Low-latency duplex bidirectional messaging             |
+| **Real-Time Gateway** | Socket.IO 4.8+ + Redis Adapter    | Distributed low-latency duplex bidirectional messaging |
 | **Database**          | MongoDB 7.0 + Mongoose 8+         | Primary document persistence & connection lifecycle    |
 | **Cache & Ephemeral** | Redis 7.2 + ioredis 5+            | Session store, presence TTL keys, health checks        |
 | **Mobile Client**     | React Native 0.76+ / Expo SDK 54+ | iOS & Android cross-platform client with Expo Router   |
@@ -125,7 +127,8 @@ The environment system strictly validates 13 distinct categories in `@chatlock/c
 - [x] **Task 11 — Offline-First Reliability**: Resilient message delivery across network drops (`online`, `offline`, `connecting`, `reconnecting`), persistent encrypted local outbox queue (`chatlock_persistent_outbox_v1`), controlled exponential backoff retry engine with jitter & max 5 retry cap, error classification (retryable vs non-retryable), and app lifecycle foreground/background restoration.
 - [x] **Task 12 — Presence & Typing Indicators**: Redis ephemeral presence tracking (`presence:{userId}` key with 60s TTL), 25s client heartbeat loop refreshing TTL with zero database write overhead, durable MongoDB `lastSeenAt` & offline status update on connection disconnect, real-time typing indicators (`typing:start`, `typing:stop`) with 3s composer debounce and 4s auto-expiration.
 - [x] **Task 13 — Delivery and Read Receipts**: Full monotonic receipt lifecycle ($\text{sent} \to \text{delivered} \to \text{read}$), real-time `message:delivered` and `message:read` Socket.IO events, durable `MessageReceipt` MongoDB persistence, multi-device synchronization, client automatic receipt dispatch on receive/read, and UI status indicator rendering (✓, ✓✓ grey, ✓✓ cyan).
-- [ ] **Task 14 — Media & File Attachments**: Secure multi-part uploads, thumbnail generation, S3/local storage abstraction, progress tracking, and media message bubbles.
-- [ ] **Task 15 — Push Notifications**: FCM & APNs integration, background delivery tokens in `Device` collection, notification badges, and offline payload delivery.
-- [ ] **Task 16 — Security & End-to-End Encryption (E2EE)**: Pre-key bundles, Signal Protocol / Double Ratchet session management, encrypted payloads, and cryptographic audit.
-- [ ] **Task 17 — Production Observability & Hardening**: Sentry crash reporting, Prometheus metrics, rate limiting calibration, Docker production images, and load testing.
+- [x] **Task 14 — Production Hardening & Security Fortification**: Recursive NoSQL injection sanitization, token reuse detection with full session family revocation (RFC 6819), timing attack mitigation on authentication, Socket.IO duplex event rate limiting (max 40 ops/sec per socket), Socket.IO `@socket.io/redis-adapter` for multi-node cluster scaling, live global conversation list sync with unread badges, instant search filter, and User Profile & Security Settings management (`settings.tsx`, `PATCH /api/v1/users/me`, `POST /api/v1/auth/logout-all`).
+- [ ] **Task 15 — Media & File Attachments**: Secure multi-part uploads, thumbnail generation, S3/local storage abstraction, progress tracking, and media message bubbles.
+- [ ] **Task 16 — Push Notifications**: FCM & APNs integration, background delivery tokens in `Device` collection, notification badges, and offline payload delivery.
+- [ ] **Task 17 — End-to-End Encryption (E2EE)**: Pre-key bundles, Signal Protocol / Double Ratchet session management, encrypted payloads, and cryptographic audit.
+- [ ] **Task 18 — Production Observability & Sentry**: Sentry crash reporting, Prometheus metrics, and load testing.

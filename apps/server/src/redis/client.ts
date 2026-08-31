@@ -130,6 +130,10 @@ class RedisConnectionManager {
     return this.state === 'ready';
   }
 
+  public createDuplicateClient(): Redis {
+    return this.createClient();
+  }
+
   public async ping(): Promise<boolean> {
     if (!this.client || this.state !== 'ready') {
       return false;

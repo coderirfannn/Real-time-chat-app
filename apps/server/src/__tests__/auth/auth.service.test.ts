@@ -47,6 +47,7 @@ describe('AuthService Business Logic', () => {
     mockSessionRepo = {
       createSession: vi.fn().mockResolvedValue({} as unknown as ISessionDoc),
       findByTokenHash: vi.fn(),
+      findAnyByTokenHash: vi.fn().mockResolvedValue(null),
       revokeSession: vi.fn().mockResolvedValue({} as unknown as ISessionDoc),
       revokeAllUserSessions: vi.fn().mockResolvedValue(2),
     };

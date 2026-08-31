@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { conversationApi } from '../../../services/api/conversation.api';
 import { socketManager } from '../../../services/socket/socket.manager';
 import { useAuthStore } from '../../../store/auth.store';
-import type { IMessage, UserProfile } from '@chatlock/shared-types';
+import type { IMessage, UserProfile, PresenceUpdatePayload } from '@chatlock/shared-types';
 import type { ConversationItemData } from '../../../types/chat.types';
 
 export const CONVERSATIONS_QUERY_KEY = ['conversations'];
@@ -14,6 +14,11 @@ interface ConversationApiItem {
   type: string;
   participants: Array<UserProfile | string>;
   lastMessageId?: unknown;
+  lastMessage?: {
+    content?: string;
+    senderId?: string;
+    createdAt?: string;
+  };
   lastMessageAt?: string;
   unreadCount?: number;
   createdAt?: string;
@@ -57,7 +62,10 @@ export function useConversations() {
               ...item,
               lastMessage: {
                 content: message.content,
-                senderId: message.senderId,
+                senderId:
+                  typeof message.senderId === 'string'
+                    ? message.senderId
+                    : (message.senderId as { id?: string }).id,
                 createdAt: message.createdAt,
               },
               lastMessageAt: message.createdAt,
@@ -80,10 +88,77 @@ export function useConversations() {
     [queryClient, currentUserId],
   );
 
+  // Socket listener for read receipts to clear unread counters
+  const handleMessageRead = useCallback(
+    (payload: { conversationId: string; userId: string }) => {
+      if (payload.userId === currentUserId) {
+        queryClient.setQueryData(CONVERSATIONS_QUERY_KEY, (oldData: unknown) => {
+          if (!oldData) return oldData;
+          const list = Array.isArray(oldData)
+            ? oldData
+            : (oldData as { docs?: ConversationApiItem[] }).docs || [];
+
+          const updated = list.map((item: ConversationApiItem) => {
+            const itemId = item.id || item._id;
+            if (itemId === payload.conversationId) {
+              return {
+                ...item,
+                unreadCount: 0,
+              };
+            }
+            return item;
+          });
+
+          return Array.isArray(oldData) ? updated : { ...(oldData as object), docs: updated };
+        });
+      }
+    },
+    [queryClient, currentUserId],
+  );
+
+  // Socket listener for presence updates
+  const handlePresenceUpdate = useCallback(
+    (payload: PresenceUpdatePayload) => {
+      queryClient.setQueryData(CONVERSATIONS_QUERY_KEY, (oldData: unknown) => {
+        if (!oldData) return oldData;
+        const list = Array.isArray(oldData)
+          ? oldData
+          : (oldData as { docs?: ConversationApiItem[] }).docs || [];
+
+        const updated = list.map((item: ConversationApiItem) => {
+          if (Array.isArray(item.participants)) {
+            const updatedParticipants = item.participants.map((p) => {
+              if (typeof p === 'object' && p.id === payload.userId) {
+                return {
+                  ...p,
+                  status: payload.status,
+                  lastSeenAt: payload.lastSeenAt || p.lastSeenAt,
+                };
+              }
+              return p;
+            });
+            return { ...item, participants: updatedParticipants };
+          }
+          return item;
+        });
+
+        return Array.isArray(oldData) ? updated : { ...(oldData as object), docs: updated };
+      });
+    },
+    [queryClient],
+  );
+
   useEffect(() => {
-    const unsub = socketManager.onNewMessage(handleNewMessage);
-    return unsub;
-  }, [handleNewMessage]);
+    const unsubNew = socketManager.onNewMessage(handleNewMessage);
+    const unsubRead = socketManager.onMessageRead(handleMessageRead);
+    const unsubPresence = socketManager.onPresenceUpdate(handlePresenceUpdate);
+
+    return () => {
+      unsubNew();
+      unsubRead();
+      unsubPresence();
+    };
+  }, [handleNewMessage, handleMessageRead, handlePresenceUpdate]);
 
   const conversations: ConversationItemData[] = useMemo(() => {
     if (!rawData) return [];
@@ -116,8 +191,7 @@ export function useConversations() {
       const lastMsg =
         conv.lastMessageId && typeof conv.lastMessageId === 'object'
           ? (conv.lastMessageId as { content?: string; senderId?: string; createdAt?: string })
-          : (conv as { lastMessage?: { content?: string; senderId?: string; createdAt?: string } })
-              .lastMessage;
+          : conv.lastMessage;
 
       return {
         id: convId,

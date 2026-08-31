@@ -15,6 +15,10 @@ export class SessionRepository extends BaseRepository<ISessionDoc> {
     });
   }
 
+  public async findAnyByTokenHash(tokenHash: string): Promise<ISessionDoc | null> {
+    return this.findOne({ tokenHash });
+  }
+
   public async createSession(data: {
     userId: string | Types.ObjectId;
     tokenHash: string;

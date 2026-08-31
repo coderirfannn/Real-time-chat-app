@@ -1,5 +1,6 @@
 import type { Server as HttpServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -11,10 +12,15 @@ import {
   socketAuthMiddleware,
   type AuthenticatedSocket,
 } from './middleware/auth.socket.middleware.js';
+import {
+  socketRateLimitMiddleware,
+  clearSocketRateLimit,
+} from './middleware/rate-limit.socket.middleware.js';
 import { connectionManager } from './connection.js';
 import { roomManager } from './rooms.js';
 import { registerSocketEvents, broadcastUserPresence } from './events/index.js';
 import { presenceService } from '../services/presence.service.js';
+import { redisManager } from '../redis/client.js';
 import { logger } from '../utils/logger.js';
 
 const socketServerLogger = logger.child('SocketServer');
@@ -47,13 +53,32 @@ export function initSocketServer(httpServer: HttpServer): TypedSocketServer {
     transports: ['websocket', 'polling'],
   });
 
-  // 1. Register authentication handshake middleware
+  // 1. Configure Redis Adapter for Horizontal Multi-Node Cluster Scaling
+  if (process.env['NODE_ENV'] !== 'test') {
+    try {
+      const pubClient = redisManager.createDuplicateClient();
+      const subClient = redisManager.createDuplicateClient();
+      io.adapter(createAdapter(pubClient, subClient));
+      socketServerLogger.info('Socket.IO Redis adapter configured for horizontal cluster scaling');
+    } catch (err) {
+      socketServerLogger.warn('Socket.IO running in standalone in-memory adapter mode', {
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  // 2. Register authentication handshake middleware
   io.use(socketAuthMiddleware);
 
-  // 2. Handle connection lifecycle
+  // 3. Handle connection lifecycle
   io.on('connection', (socket: AuthenticatedSocket) => {
     const userId = socket.data.user.id;
     const username = socket.data.user.username;
+
+    // Register rate limiting packet interceptor
+    socket.use((packet, next) => {
+      socketRateLimitMiddleware(socket, packet, next);
+    });
 
     // Register active socket connection
     const reg = connectionManager.register(userId, socket.id);
@@ -82,8 +107,12 @@ export function initSocketServer(httpServer: HttpServer): TypedSocketServer {
         });
     }
 
-    // Attach room, lifecycle, and messaging event handlers
+    // Attach room, lifecycle, messaging, and receipt event handlers
     registerSocketEvents(socket, io);
+
+    socket.on('disconnect', () => {
+      clearSocketRateLimit(socket.id);
+    });
   });
 
   ioInstance = io;
@@ -122,4 +151,5 @@ export async function closeSocketIO(): Promise<void> {
 export * from './connection.js';
 export * from './rooms.js';
 export * from './middleware/auth.socket.middleware.js';
+export * from './middleware/rate-limit.socket.middleware.js';
 export * from './events/index.js';

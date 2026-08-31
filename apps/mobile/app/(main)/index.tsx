@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -28,9 +28,11 @@ import type { UserProfile } from '@chatlock/shared-types';
 export default function ConversationListScreen(): React.JSX.Element {
   const router = useRouter();
   const currentUser = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
 
   const { conversations, isLoading, isRefetching, refetch } = useConversations();
+
+  // Local filter for active conversations
+  const [filterQuery, setFilterQuery] = useState('');
 
   // New Chat Modal state
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -47,6 +49,10 @@ export default function ConversationListScreen(): React.JSX.Element {
     [router],
   );
 
+  const handleOpenSettings = useCallback(() => {
+    router.push('/(main)/settings' as never);
+  }, [router]);
+
   const handleOpenNewChatModal = useCallback(() => {
     setIsModalVisible(true);
     setSearchQuery('');
@@ -59,6 +65,18 @@ export default function ConversationListScreen(): React.JSX.Element {
     setSearchQuery('');
     setSearchResults([]);
   }, []);
+
+  // Filter conversations locally
+  const filteredConversations = useMemo(() => {
+    if (!filterQuery.trim()) return conversations;
+    const clean = filterQuery.toLowerCase().trim();
+    return conversations.filter(
+      (c) =>
+        c.recipient.displayName?.toLowerCase().includes(clean) ||
+        c.recipient.username?.toLowerCase().includes(clean) ||
+        c.lastMessage?.content?.toLowerCase().includes(clean),
+    );
+  }, [conversations, filterQuery]);
 
   // Search users effect with debouncing
   useEffect(() => {
@@ -102,11 +120,6 @@ export default function ConversationListScreen(): React.JSX.Element {
     },
     [router, handleCloseNewChatModal],
   );
-
-  const handleLogout = useCallback(async () => {
-    await logout();
-    router.replace('/(auth)/login' as never);
-  }, [logout, router]);
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<ConversationItemData>) => (
@@ -156,7 +169,11 @@ export default function ConversationListScreen(): React.JSX.Element {
 
       {/* Top Profile & Header Bar */}
       <View style={styles.header}>
-        <View style={styles.userProfileInfo}>
+        <TouchableOpacity
+          style={styles.userProfileInfo}
+          onPress={handleOpenSettings}
+          activeOpacity={0.7}
+        >
           <Avatar
             name={currentUser?.displayName || currentUser?.username || 'Me'}
             avatarUrl={currentUser?.avatarUrl}
@@ -169,7 +186,7 @@ export default function ConversationListScreen(): React.JSX.Element {
             </Text>
             <Text style={styles.userHandle}>@{currentUser?.username || 'user'}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.headerActions}>
           <TouchableOpacity
@@ -180,22 +197,52 @@ export default function ConversationListScreen(): React.JSX.Element {
             <Text style={styles.newChatButtonText}>+ New</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.7}>
-            <Text style={styles.logoutText}>Logout</Text>
+          <TouchableOpacity
+            style={styles.settingsButton}
+            onPress={handleOpenSettings}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.settingsButtonText}>⚙️</Text>
           </TouchableOpacity>
         </View>
       </View>
 
+      {/* Local Search / Filter Bar */}
+      {conversations.length > 0 && (
+        <View style={styles.filterBar}>
+          <Text style={styles.filterIcon}>🔍</Text>
+          <TextInput
+            style={styles.filterInput}
+            placeholder="Filter chats by name or message..."
+            placeholderTextColor="#64748B"
+            value={filterQuery}
+            onChangeText={setFilterQuery}
+            autoCapitalize="none"
+          />
+          {Boolean(filterQuery) && (
+            <TouchableOpacity onPress={() => setFilterQuery('')} style={styles.clearFilterTouch}>
+              <Text style={styles.clearFilterText}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
       {/* Main Conversation Feed */}
       <FlatList
-        data={conversations}
+        data={filteredConversations}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
-        contentContainerStyle={conversations.length === 0 ? styles.emptyContainer : undefined}
+        contentContainerStyle={
+          filteredConversations.length === 0 ? styles.emptyContainer : undefined
+        }
         ListEmptyComponent={
           <EmptyState
-            title="No Conversations Yet"
-            description="Tap '+ New' to find contacts and start your first secure real-time chat."
+            title={filterQuery.trim() ? 'No Matching Chats' : 'No Conversations Yet'}
+            description={
+              filterQuery.trim()
+                ? 'No active chats match your filter.'
+                : "Tap '+ New' to find contacts and start your first secure real-time chat."
+            }
           />
         }
         refreshControl={
@@ -312,41 +359,66 @@ const styles = StyleSheet.create({
     backgroundColor: '#0284C7',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 8,
   },
   newChatButtonText: {
     color: '#FFFFFF',
-    fontSize: 13,
     fontWeight: '700',
+    fontSize: 13,
   },
-  logoutButton: {
-    paddingHorizontal: 10,
+  settingsButton: {
+    paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#334155',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
-  logoutText: {
-    color: '#EF4444',
-    fontSize: 12,
-    fontWeight: '600',
+  settingsButtonText: {
+    fontSize: 16,
+  },
+  filterBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    marginHorizontal: 16,
+    marginVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  filterIcon: {
+    marginRight: 8,
+    fontSize: 14,
+  },
+  filterInput: {
+    flex: 1,
+    height: 38,
+    color: '#FFFFFF',
+    fontSize: 14,
+  },
+  clearFilterTouch: {
+    padding: 6,
+  },
+  clearFilterText: {
+    color: '#94A3B8',
+    fontSize: 14,
   },
   emptyContainer: {
-    flex: 1,
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'flex-end',
   },
   modalCard: {
     backgroundColor: '#1E293B',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: '80%',
-    padding: 20,
-    borderTopWidth: 1,
-    borderColor: '#334155',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '85%',
+    minHeight: '55%',
+    padding: 16,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -357,10 +429,10 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#F8FAFC',
+    color: '#FFFFFF',
   },
   closeModalTouch: {
-    padding: 6,
+    padding: 4,
   },
   closeModalText: {
     color: '#94A3B8',
@@ -371,30 +443,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#0F172A',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
+    borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
     marginBottom: 12,
-    gap: 8,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
   },
   searchIcon: {
-    fontSize: 16,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    color: '#F8FAFC',
+    height: 44,
+    color: '#FFFFFF',
     fontSize: 15,
   },
   modalError: {
     backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderColor: '#EF4444',
+    borderWidth: 1,
     borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
+    padding: 8,
+    marginBottom: 8,
   },
   modalErrorText: {
-    color: '#FCA5A5',
+    color: '#F87171',
     fontSize: 13,
   },
   searchResultsList: {
@@ -403,28 +476,28 @@ const styles = StyleSheet.create({
   searchUserItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
-    gap: 12,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
   },
   searchUserInfo: {
     flex: 1,
+    marginLeft: 12,
   },
   searchUserDisplayName: {
+    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '600',
-    color: '#F8FAFC',
   },
   searchUserHandle: {
+    color: '#38BDF8',
     fontSize: 13,
-    color: '#94A3B8',
+    marginTop: 2,
   },
   startChatAction: {
-    color: '#38BDF8',
-    fontSize: 14,
+    color: '#0284C7',
     fontWeight: '700',
+    fontSize: 14,
   },
   noResultsContainer: {
     paddingVertical: 32,
