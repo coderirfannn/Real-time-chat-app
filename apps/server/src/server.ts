@@ -56,7 +56,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
   initSocketServer(server);
 
   return new Promise((resolve) => {
-    server.listen(port, () => {
+    server.listen(port, '0.0.0.0', () => {
       serverLogger.info(`Server running on port ${port} in [${config.app.env}] mode`, {
         port,
         env: config.app.env,
