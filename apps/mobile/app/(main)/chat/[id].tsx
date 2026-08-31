@@ -15,6 +15,7 @@ import { MessageComposer } from '../../../src/features/chat/components/MessageCo
 import { Avatar } from '../../../src/components/Avatar';
 import { ConnectionBanner } from '../../../src/components/ConnectionBanner';
 import { LoadingSpinner } from '../../../src/components/LoadingSpinner';
+import { formatLastSeenTime } from '../../../src/utils/date-formatter';
 
 export default function ChatScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -28,8 +29,11 @@ export default function ChatScreen(): React.JSX.Element {
     isSending,
     isFetchingNextPage,
     isRefreshing,
+    isPeerTyping,
     sendMessage,
     retryMessage,
+    startTyping,
+    stopTyping,
     loadMoreMessages,
     refresh,
   } = useChat(conversationId);
@@ -40,6 +44,12 @@ export default function ChatScreen(): React.JSX.Element {
 
   const displayName = recipient.displayName || recipient.username || 'Direct Message';
   const isOnline = recipient.status === 'online';
+
+  const subtitleText = isPeerTyping
+    ? 'typing...'
+    : isOnline
+      ? 'Online'
+      : formatLastSeenTime(recipient.lastSeenAt);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -57,7 +67,11 @@ export default function ChatScreen(): React.JSX.Element {
           <Text style={styles.headerTitle} numberOfLines={1}>
             {displayName}
           </Text>
-          <Text style={styles.headerSubtitle}>{isOnline ? 'Online' : 'Offline'}</Text>
+          <Text
+            style={[styles.headerSubtitle, isPeerTyping ? styles.headerSubtitleTyping : undefined]}
+          >
+            {subtitleText}
+          </Text>
         </View>
       </View>
 
@@ -72,6 +86,7 @@ export default function ChatScreen(): React.JSX.Element {
         ) : (
           <MessageList
             items={feedItems}
+            isTyping={isPeerTyping}
             isLoadingMore={isFetchingNextPage}
             refreshing={isRefreshing}
             onRefresh={refresh}
@@ -80,7 +95,12 @@ export default function ChatScreen(): React.JSX.Element {
           />
         )}
 
-        <MessageComposer onSendMessage={sendMessage} disabled={isSending} />
+        <MessageComposer
+          onSendMessage={sendMessage}
+          onTypingStart={startTyping}
+          onTypingStop={stopTyping}
+          disabled={isSending}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -123,6 +143,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#94A3B8',
     marginTop: 1,
+  },
+  headerSubtitleTyping: {
+    color: '#38BDF8',
+    fontWeight: '600',
   },
   chatArea: {
     flex: 1,

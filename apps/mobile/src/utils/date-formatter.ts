@@ -47,6 +47,28 @@ export function formatConversationTime(dateInput?: string | Date): string {
 }
 
 /**
+ * Formats user presence last-seen timestamp.
+ */
+export function formatLastSeenTime(dateInput?: string | Date): string {
+  if (!dateInput) return 'Offline';
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  if (isNaN(date.getTime())) return 'Offline';
+
+  const diffSeconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diffSeconds < 60) return 'Last seen just now';
+  if (diffSeconds < 3600) {
+    const mins = Math.floor(diffSeconds / 60);
+    return `Last seen ${mins}m ago`;
+  }
+  if (diffSeconds < 86400) {
+    const hours = Math.floor(diffSeconds / 3600);
+    return `Last seen ${hours}h ago`;
+  }
+
+  return `Last seen ${formatConversationTime(date)}`;
+}
+
+/**
  * Formats date separator labels for chat feed.
  */
 export function formatDateSeparator(dateInput: string | Date): string {

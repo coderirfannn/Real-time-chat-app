@@ -4,6 +4,7 @@ import {
   type SendMessagePayload,
   type MessageAckResponse,
   type IMessage,
+  type PresenceUpdatePayload,
 } from '@chatlock/shared-types';
 
 export class SocketManager {
@@ -106,6 +107,52 @@ export class SocketManager {
    */
   public async sendMessage(payload: SendMessagePayload): Promise<MessageAckResponse> {
     return socketService.sendMessage(payload);
+  }
+
+  /**
+   * Sends typing:start event.
+   */
+  public startTyping(conversationId: string): void {
+    socketService.startTyping(conversationId);
+  }
+
+  /**
+   * Sends typing:stop event.
+   */
+  public stopTyping(conversationId: string): void {
+    socketService.stopTyping(conversationId);
+  }
+
+  /**
+   * Sends presence heartbeat.
+   */
+  public async sendHeartbeat(): Promise<{ success: boolean }> {
+    return socketService.sendHeartbeat();
+  }
+
+  /**
+   * Registers callback for typing:start events.
+   */
+  public onTypingStart(
+    listener: (payload: { conversationId: string; userId: string }) => void,
+  ): () => void {
+    return socketService.onTypingStart(listener);
+  }
+
+  /**
+   * Registers callback for typing:stop events.
+   */
+  public onTypingStop(
+    listener: (payload: { conversationId: string; userId: string }) => void,
+  ): () => void {
+    return socketService.onTypingStop(listener);
+  }
+
+  /**
+   * Registers callback for user presence changes.
+   */
+  public onPresenceUpdate(listener: (payload: PresenceUpdatePayload) => void): () => void {
+    return socketService.onPresenceUpdate(listener);
   }
 
   /**

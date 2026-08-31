@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { conversationApi } from '../../../services/api/conversation.api';
 import { socketManager } from '../../../services/socket/socket.manager';
@@ -15,6 +15,7 @@ import type {
   MessageAckResponse,
   UserProfile,
   IConversation,
+  PresenceUpdatePayload,
 } from '@chatlock/shared-types';
 
 export interface UseChatReturn {
@@ -25,9 +26,12 @@ export interface UseChatReturn {
   isFetchingNextPage: boolean;
   hasNextPage: boolean;
   isRefreshing: boolean;
+  isPeerTyping: boolean;
   error: Error | null;
   sendMessage: (content: string) => Promise<void>;
   retryMessage: (clientMessageId: string) => Promise<void>;
+  startTyping: () => void;
+  stopTyping: () => void;
   loadMoreMessages: () => void;
   refetchHistory: () => Promise<unknown>;
   refresh: () => Promise<void>;
@@ -48,6 +52,10 @@ export function useChat(conversationId: string): UseChatReturn {
   const [outboxMessages, setOutboxMessages] = useState<OutboxMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isPeerTyping, setIsPeerTyping] = useState(false);
+  const [peerPresence, setPeerPresence] = useState<{ status?: string; lastSeenAt?: string }>({});
+
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 1. Fetch conversation details (participants & recipient)
   const { data: convData, isLoading: isLoadingConv } = useQuery({
@@ -94,30 +102,39 @@ export function useChat(conversationId: string): UseChatReturn {
     };
   }, [conversationId]);
 
-  // Extract recipient info
+  // Extract recipient info and merge with live presence
   const recipient: UserProfile = useMemo(() => {
-    if (!convData) {
-      return { id: 'peer', username: 'Chat', displayName: 'Conversation', status: 'offline' };
-    }
+    let basePeer: UserProfile = {
+      id: 'peer',
+      username: 'Chat',
+      displayName: 'Conversation',
+      status: 'offline',
+    };
 
-    const rawConv =
-      (convData as { conversation?: { participants?: Array<UserProfile | string> } })
-        .conversation || convData;
-    const participants = (rawConv as { participants?: Array<UserProfile | string> }).participants;
+    if (convData) {
+      const rawConv =
+        (convData as { conversation?: { participants?: Array<UserProfile | string> } })
+          .conversation || convData;
+      const participants = (rawConv as { participants?: Array<UserProfile | string> }).participants;
 
-    if (Array.isArray(participants)) {
-      const peer = participants.find((p) => {
-        if (typeof p === 'string') return p !== currentUserId;
-        return p.id !== currentUserId && (p as { _id?: string })._id !== currentUserId;
-      });
+      if (Array.isArray(participants)) {
+        const peer = participants.find((p) => {
+          if (typeof p === 'string') return p !== currentUserId;
+          return p.id !== currentUserId && (p as { _id?: string })._id !== currentUserId;
+        });
 
-      if (peer && typeof peer === 'object') {
-        return peer;
+        if (peer && typeof peer === 'object') {
+          basePeer = peer;
+        }
       }
     }
 
-    return { id: 'peer', username: 'Chat', displayName: 'Conversation', status: 'offline' };
-  }, [convData, currentUserId]);
+    return {
+      ...basePeer,
+      status: (peerPresence.status as UserProfile['status']) || basePeer.status || 'offline',
+      lastSeenAt: peerPresence.lastSeenAt || basePeer.lastSeenAt,
+    };
+  }, [convData, currentUserId, peerPresence]);
 
   // 4. Socket Room Lifecycle: Join on mount, leave on unmount
   useEffect(() => {
@@ -138,7 +155,66 @@ export function useChat(conversationId: string): UseChatReturn {
     }
   }, [socketConnectionState, conversationId, refetchHistory]);
 
-  // 6. Socket Listeners: onNewMessage & onMessageSent with cache reconciliation
+  // 6. Periodic Heartbeat Loop (refreshes Redis presence TTL every 25 seconds)
+  useEffect(() => {
+    if (socketConnectionState !== 'connected') return;
+
+    const interval = setInterval(() => {
+      socketManager.sendHeartbeat().catch(() => {});
+    }, 25000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [socketConnectionState]);
+
+  // 7. Presence and Typing Listeners
+  useEffect(() => {
+    if (!conversationId) return;
+
+    const unsubTypingStart = socketManager.onTypingStart((payload) => {
+      if (payload.conversationId === conversationId && payload.userId !== currentUserId) {
+        setIsPeerTyping(true);
+
+        // Auto-expire stale typing indicator after 4 seconds
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
+        typingTimeoutRef.current = setTimeout(() => {
+          setIsPeerTyping(false);
+        }, 4000);
+      }
+    });
+
+    const unsubTypingStop = socketManager.onTypingStop((payload) => {
+      if (payload.conversationId === conversationId && payload.userId !== currentUserId) {
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
+        setIsPeerTyping(false);
+      }
+    });
+
+    const unsubPresence = socketManager.onPresenceUpdate((payload: PresenceUpdatePayload) => {
+      if (payload.userId === recipient.id) {
+        setPeerPresence({
+          status: payload.status,
+          lastSeenAt: payload.lastSeenAt,
+        });
+      }
+    });
+
+    return () => {
+      unsubTypingStart();
+      unsubTypingStop();
+      unsubPresence();
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, [conversationId, currentUserId, recipient.id]);
+
+  // 8. Socket Listeners: onNewMessage & onMessageSent with cache reconciliation
   useEffect(() => {
     const unsubNew = socketManager.onNewMessage((newMsg: IMessage) => {
       if (newMsg.conversationId !== conversationId) return;
@@ -169,6 +245,11 @@ export function useChat(conversationId: string): UseChatReturn {
         return [...prev, formattedMsg];
       });
 
+      // Clear typing indicator when message arrives from peer
+      if (newMsg.senderId !== currentUserId) {
+        setIsPeerTyping(false);
+      }
+
       // Update global conversations query cache
       queryClient.setQueryData<IConversation[]>(['conversations'], (oldConvs) => {
         if (!oldConvs) return oldConvs;
@@ -196,12 +277,15 @@ export function useChat(conversationId: string): UseChatReturn {
       unsubNew();
       unsubSent();
     };
-  }, [conversationId, queryClient]);
+  }, [conversationId, queryClient, currentUserId]);
 
-  // 7. Send message with offline-first durable outbox queue
+  // 9. Send message with offline-first durable outbox queue
   const sendMessage = useCallback(
     async (content: string) => {
       if (!content.trim() || !conversationId) return;
+
+      // Stop typing immediately upon send
+      socketManager.stopTyping(conversationId);
 
       const clientMessageId = generateClientMessageId();
       const isConnected = socketManager.isConnected() && isNetworkOnline;
@@ -240,19 +324,31 @@ export function useChat(conversationId: string): UseChatReturn {
     [conversationId, currentUser, currentUserId, isNetworkOnline],
   );
 
-  // 8. Retry failed or pending message
+  const startTyping = useCallback(() => {
+    if (conversationId && socketManager.isConnected()) {
+      socketManager.startTyping(conversationId);
+    }
+  }, [conversationId]);
+
+  const stopTyping = useCallback(() => {
+    if (conversationId && socketManager.isConnected()) {
+      socketManager.stopTyping(conversationId);
+    }
+  }, [conversationId]);
+
+  // 10. Retry failed or pending message
   const retryMessage = useCallback(async (clientMessageId: string) => {
     await outboxSyncManager.retryMessage(clientMessageId);
   }, []);
 
-  // 9. Load older messages (upward pagination)
+  // 11. Load older messages (upward pagination)
   const loadMoreMessages = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
       fetchNextPage();
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // 10. Pull-to-refresh / full synchronization
+  // 12. Pull-to-refresh / full synchronization
   const refresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
@@ -265,7 +361,7 @@ export function useChat(conversationId: string): UseChatReturn {
     }
   }, [refetchHistory]);
 
-  // 11. Reconcile history pages with socket and outbox messages
+  // 13. Reconcile history pages with socket and outbox messages
   const allMessages: LocalMessage[] = useMemo(() => {
     return reconcileChatMessages({
       historyPages: infiniteHistory?.pages,
@@ -274,7 +370,7 @@ export function useChat(conversationId: string): UseChatReturn {
     });
   }, [infiniteHistory?.pages, socketMessages, outboxMessages]);
 
-  // 12. Build inverted feed items
+  // 14. Build inverted feed items
   const feedItems = useMemo(
     () => buildInvertedChatFeed(allMessages, currentUserId),
     [allMessages, currentUserId],
@@ -288,9 +384,12 @@ export function useChat(conversationId: string): UseChatReturn {
     isFetchingNextPage: Boolean(isFetchingNextPage),
     hasNextPage: Boolean(hasNextPage),
     isRefreshing,
+    isPeerTyping,
     error: (historyError as Error) || null,
     sendMessage,
     retryMessage,
+    startTyping,
+    stopTyping,
     loadMoreMessages,
     refetchHistory,
     refresh,

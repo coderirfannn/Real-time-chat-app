@@ -53,9 +53,14 @@ export const messageCursorPaginationSchema = z.object({
   direction: z.enum(['before', 'after']).default('before'),
 });
 
+export const typingEventSchema = z.object({
+  conversationId: idSchema,
+});
+
 export type CreateDirectConversationInput = z.infer<typeof createDirectConversationSchema>;
 export type CreateConversationInput = z.infer<typeof createConversationSchema>;
 export type ConversationPaginationInput = z.infer<typeof conversationPaginationSchema>;
 export type ConversationIdParamsInput = z.infer<typeof conversationIdParamsSchema>;
 export type MessageCursorPaginationInput = z.infer<typeof messageCursorPaginationSchema>;
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
+export type TypingEventInput = z.infer<typeof typingEventSchema>;

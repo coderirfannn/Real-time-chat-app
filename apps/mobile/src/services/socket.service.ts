@@ -6,6 +6,7 @@ import {
   type SendMessagePayload,
   type MessageAckResponse,
   type IMessage,
+  type PresenceUpdatePayload,
 } from '@chatlock/shared-types';
 import { mobileConfig } from '../config/env';
 
@@ -133,6 +134,87 @@ export class SocketService {
         resolve(ack);
       });
     });
+  }
+
+  /**
+   * Dispatches typing:start to conversation participants.
+   */
+  public startTyping(conversationId: string): void {
+    const socket = this.getSocket();
+    if (socket.connected) {
+      socket.emit(SocketEvents.TYPING_START, { conversationId });
+    }
+  }
+
+  /**
+   * Dispatches typing:stop to conversation participants.
+   */
+  public stopTyping(conversationId: string): void {
+    const socket = this.getSocket();
+    if (socket.connected) {
+      socket.emit(SocketEvents.TYPING_STOP, { conversationId });
+    }
+  }
+
+  /**
+   * Dispatches presence heartbeat to refresh Redis TTL.
+   */
+  public async sendHeartbeat(): Promise<{ success: boolean }> {
+    const socket = this.getSocket();
+    if (!socket.connected) {
+      return { success: false };
+    }
+
+    return new Promise((resolve) => {
+      socket.emit(SocketEvents.PRESENCE_HEARTBEAT, (res: { success: boolean }) => {
+        resolve(res || { success: true });
+      });
+    });
+  }
+
+  /**
+   * Registers callback for typing:start events.
+   */
+  public onTypingStart(
+    listener: (payload: { conversationId: string; userId: string }) => void,
+  ): () => void {
+    const socket = this.getSocket();
+    socket.on(SocketEvents.TYPING_START, listener);
+    socket.on(SocketEvents.TYPING_START_LEGACY, listener);
+    return () => {
+      socket.off(SocketEvents.TYPING_START, listener);
+      socket.off(SocketEvents.TYPING_START_LEGACY, listener);
+    };
+  }
+
+  /**
+   * Registers callback for typing:stop events.
+   */
+  public onTypingStop(
+    listener: (payload: { conversationId: string; userId: string }) => void,
+  ): () => void {
+    const socket = this.getSocket();
+    socket.on(SocketEvents.TYPING_STOP, listener);
+    socket.on(SocketEvents.TYPING_STOP_LEGACY, listener);
+    return () => {
+      socket.off(SocketEvents.TYPING_STOP, listener);
+      socket.off(SocketEvents.TYPING_STOP_LEGACY, listener);
+    };
+  }
+
+  /**
+   * Registers callback for presence update events.
+   */
+  public onPresenceUpdate(listener: (payload: PresenceUpdatePayload) => void): () => void {
+    const socket = this.getSocket();
+    socket.on(SocketEvents.USER_PRESENCE, listener);
+    socket.on(SocketEvents.PRESENCE_UPDATE, listener);
+    socket.on(SocketEvents.USER_STATUS_CHANGE, listener);
+    return () => {
+      socket.off(SocketEvents.USER_PRESENCE, listener);
+      socket.off(SocketEvents.PRESENCE_UPDATE, listener);
+      socket.off(SocketEvents.USER_STATUS_CHANGE, listener);
+    };
   }
 
   /**

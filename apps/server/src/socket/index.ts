@@ -13,7 +13,8 @@ import {
 } from './middleware/auth.socket.middleware.js';
 import { connectionManager } from './connection.js';
 import { roomManager } from './rooms.js';
-import { registerSocketEvents } from './events/index.js';
+import { registerSocketEvents, broadcastUserPresence } from './events/index.js';
+import { presenceService } from '../services/presence.service.js';
 import { logger } from '../utils/logger.js';
 
 const socketServerLogger = logger.child('SocketServer');
@@ -68,6 +69,18 @@ export function initSocketServer(httpServer: HttpServer): TypedSocketServer {
       activeSockets: reg.activeSocketsCount,
       isFirstConnection: reg.isFirstConnection,
     });
+
+    // If this is the user's first active connection, set presence online in Redis & MongoDB and broadcast
+    if (reg.isFirstConnection) {
+      presenceService
+        .setOnline(userId)
+        .then((payload) => {
+          broadcastUserPresence(io, payload);
+        })
+        .catch((err) => {
+          socketServerLogger.warn('Error setting user online on connect', { userId, error: err });
+        });
+    }
 
     // Attach room, lifecycle, and messaging event handlers
     registerSocketEvents(socket, io);

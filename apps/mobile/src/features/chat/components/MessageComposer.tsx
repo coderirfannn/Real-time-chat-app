@@ -1,18 +1,70 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native';
 
 export interface MessageComposerProps {
   onSendMessage: (content: string) => void;
+  onTypingStart?: () => void;
+  onTypingStop?: () => void;
   disabled?: boolean;
   placeholder?: string;
 }
 
 export function MessageComposer({
   onSendMessage,
+  onTypingStart,
+  onTypingStop,
   disabled = false,
   placeholder = 'Type a message...',
 }: MessageComposerProps): React.JSX.Element {
   const [text, setText] = useState('');
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isTypingRef = useRef(false);
+
+  const clearTypingTimer = useCallback(() => {
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = null;
+    }
+  }, []);
+
+  const stopTyping = useCallback(() => {
+    clearTypingTimer();
+    if (isTypingRef.current) {
+      isTypingRef.current = false;
+      onTypingStop?.();
+    }
+  }, [clearTypingTimer, onTypingStop]);
+
+  const handleChangeText = useCallback(
+    (newText: string) => {
+      setText(newText);
+
+      if (disabled) return;
+
+      const trimmed = newText.trim();
+      if (trimmed.length > 0) {
+        if (!isTypingRef.current) {
+          isTypingRef.current = true;
+          onTypingStart?.();
+        }
+
+        // Reset 3s inactivity auto-stop timer
+        clearTypingTimer();
+        typingTimerRef.current = setTimeout(() => {
+          stopTyping();
+        }, 3000);
+      } else {
+        stopTyping();
+      }
+    },
+    [disabled, onTypingStart, stopTyping, clearTypingTimer],
+  );
+
+  useEffect(() => {
+    return () => {
+      clearTypingTimer();
+    };
+  }, [clearTypingTimer]);
 
   const canSend = text.trim().length > 0 && !disabled;
 
@@ -20,9 +72,10 @@ export function MessageComposer({
     const trimmed = text.trim();
     if (!trimmed || disabled) return;
 
+    stopTyping();
     onSendMessage(trimmed);
     setText('');
-  }, [text, disabled, onSendMessage]);
+  }, [text, disabled, onSendMessage, stopTyping]);
 
   return (
     <View style={styles.container}>
@@ -32,7 +85,7 @@ export function MessageComposer({
           placeholder={placeholder}
           placeholderTextColor="#64748B"
           value={text}
-          onChangeText={setText}
+          onChangeText={handleChangeText}
           multiline
           maxLength={4000}
           editable={!disabled}

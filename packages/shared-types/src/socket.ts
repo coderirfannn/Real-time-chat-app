@@ -15,8 +15,13 @@ export enum SocketEvents {
   RECEIVE_MESSAGE = 'receive_message',
   MESSAGE_DELIVERED = 'message_delivered',
   MESSAGE_READ = 'message_read',
-  TYPING_START = 'typing_start',
-  TYPING_STOP = 'typing_stop',
+  TYPING_START = 'typing:start',
+  TYPING_STOP = 'typing:stop',
+  TYPING_START_LEGACY = 'typing_start',
+  TYPING_STOP_LEGACY = 'typing_stop',
+  PRESENCE_HEARTBEAT = 'presence:heartbeat',
+  PRESENCE_UPDATE = 'presence:update',
+  USER_PRESENCE = 'user:presence',
   USER_STATUS_CHANGE = 'user_status_change',
   ERROR = 'error',
 }
@@ -46,6 +51,17 @@ export interface MessageAckResponse {
   error?: string;
 }
 
+export interface TypingPayload {
+  conversationId: ID;
+  userId?: ID;
+}
+
+export interface PresenceUpdatePayload {
+  userId: ID;
+  status: UserStatus;
+  lastSeenAt?: string;
+}
+
 export interface ClientToServerEvents {
   [SocketEvents.AUTHENTICATE]: (
     token: string,
@@ -71,6 +87,9 @@ export interface ClientToServerEvents {
   ) => void;
   [SocketEvents.TYPING_START]: (payload: { conversationId: ID }) => void;
   [SocketEvents.TYPING_STOP]: (payload: { conversationId: ID }) => void;
+  [SocketEvents.TYPING_START_LEGACY]: (payload: { conversationId: ID }) => void;
+  [SocketEvents.TYPING_STOP_LEGACY]: (payload: { conversationId: ID }) => void;
+  [SocketEvents.PRESENCE_HEARTBEAT]: (callback?: (res: { success: boolean }) => void) => void;
 }
 
 export interface ServerToClientEvents {
@@ -84,7 +103,15 @@ export interface ServerToClientEvents {
   [SocketEvents.MESSAGE_READ]: (payload: { messageId: ID; userId: ID; readAt: string }) => void;
   [SocketEvents.TYPING_START]: (payload: { conversationId: ID; userId: ID }) => void;
   [SocketEvents.TYPING_STOP]: (payload: { conversationId: ID; userId: ID }) => void;
-  [SocketEvents.USER_STATUS_CHANGE]: (payload: { userId: ID; status: UserStatus }) => void;
+  [SocketEvents.TYPING_START_LEGACY]: (payload: { conversationId: ID; userId: ID }) => void;
+  [SocketEvents.TYPING_STOP_LEGACY]: (payload: { conversationId: ID; userId: ID }) => void;
+  [SocketEvents.USER_PRESENCE]: (payload: PresenceUpdatePayload) => void;
+  [SocketEvents.PRESENCE_UPDATE]: (payload: PresenceUpdatePayload) => void;
+  [SocketEvents.USER_STATUS_CHANGE]: (payload: {
+    userId: ID;
+    status: UserStatus;
+    lastSeenAt?: string;
+  }) => void;
   [SocketEvents.ERROR]: (error: { code: string; message: string }) => void;
 }
 
