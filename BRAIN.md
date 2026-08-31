@@ -1,7 +1,7 @@
 # BRAIN.md — ChatLock Platform Architecture & System Design
 
 **Project**: ChatLock — Production-Grade Real-Time Messaging Platform  
-**Version**: 0.15.1 (Production Hardening, Fault-Tolerant Redis Fallback & Zero-Trust Security Fortified)  
+**Version**: 0.16.0 (Secure Media & File Attachments Pipeline, Signed Storage Uploads & MIME Magic Bytes Verification)  
 **Status**: Production Industry-Grade Architecture, Fault-Tolerant Real-Time Pipeline, and Multi-Node Cluster Ready
 
 ---
@@ -128,7 +128,7 @@ The environment system strictly validates 13 distinct categories in `@chatlock/c
 - [x] **Task 12 — Presence & Typing Indicators**: Redis ephemeral presence tracking (`presence:{userId}` key with 60s TTL), 25s client heartbeat loop refreshing TTL with zero database write overhead, durable MongoDB `lastSeenAt` & offline status update on connection disconnect, real-time typing indicators (`typing:start`, `typing:stop`) with 3s composer debounce and 4s auto-expiration.
 - [x] **Task 13 — Delivery and Read Receipts**: Full monotonic receipt lifecycle ($\text{sent} \to \text{delivered} \to \text{read}$), real-time `message:delivered` and `message:read` Socket.IO events, durable `MessageReceipt` MongoDB persistence, multi-device synchronization, client automatic receipt dispatch on receive/read, and UI status indicator rendering (✓, ✓✓ grey, ✓✓ cyan).
 - [x] **Task 14 — Production Hardening & Security Fortification**: Recursive NoSQL injection sanitization, token reuse detection with full session family revocation (RFC 6819), timing attack mitigation on authentication, Socket.IO duplex event rate limiting (max 40 ops/sec per socket), Socket.IO `@socket.io/redis-adapter` for multi-node cluster scaling, live global conversation list sync with unread badges, instant search filter, and User Profile & Security Settings management (`settings.tsx`, `PATCH /api/v1/users/me`, `POST /api/v1/auth/logout-all`).
-- [ ] **Task 15 — Media & File Attachments**: Secure multi-part uploads, thumbnail generation, S3/local storage abstraction, progress tracking, and media message bubbles.
+- [x] **Task 15 — Media & File Attachments**: Enterprise-grade secure media messaging subsystem. Zero binary storage inside MongoDB (only validated metadata persisted), direct signed upload pipeline (`POST /api/v1/media/upload-url` issuing HMAC-signed descriptors with 15-minute expiration), binary magic bytes inspection (JPEG, PNG, GIF, WEBP, PDF, ZIP, MP4, MP3, WAV) preventing MIME spoofing, strict size boundaries (max 25MB), Local and S3 storage providers with path traversal defense, and resilient mobile UX with staging preview ribbon, thumbnail rendering, document descriptors, and non-blocking upload failure isolation.
 - [ ] **Task 16 — Push Notifications**: FCM & APNs integration, background delivery tokens in `Device` collection, notification badges, and offline payload delivery.
 - [ ] **Task 17 — End-to-End Encryption (E2EE)**: Pre-key bundles, Signal Protocol / Double Ratchet session management, encrypted payloads, and cryptographic audit.
 - [ ] **Task 18 — Production Observability & Sentry**: Sentry crash reporting, Prometheus metrics, and load testing.

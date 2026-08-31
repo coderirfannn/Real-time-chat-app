@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { idSchema } from './common.js';
+import { messageAttachmentSchema } from './media.js';
 
 export const createDirectConversationSchema = z
   .object({
@@ -38,14 +39,24 @@ export const conversationIdParamsSchema = z.object({
   id: idSchema,
 });
 
-export const sendMessageSchema = z.object({
-  conversationId: idSchema,
-  clientMessageId: z.string().min(1, 'clientMessageId is required').max(100),
-  content: z.string().min(1, 'Message content cannot be empty').max(5000, 'Message is too long'),
-  type: z.enum(['text', 'image', 'file', 'audio', 'video', 'system']).default('text'),
-  replyToMessageId: idSchema.optional(),
-  tempId: z.string().optional(),
-});
+export const sendMessageSchema = z
+  .object({
+    conversationId: idSchema,
+    clientMessageId: z.string().min(1, 'clientMessageId is required').max(100),
+    content: z.string().max(5000, 'Message is too long').default(''),
+    type: z.enum(['text', 'image', 'file', 'audio', 'video', 'system']).default('text'),
+    attachments: z.array(messageAttachmentSchema).max(10).optional(),
+    replyToMessageId: idSchema.optional(),
+    tempId: z.string().optional(),
+  })
+  .refine(
+    (data) =>
+      data.content.trim().length > 0 || (Boolean(data.attachments) && data.attachments!.length > 0),
+    {
+      message: 'Message content or at least one attachment is required',
+      path: ['content'],
+    },
+  );
 
 export const messageCursorPaginationSchema = z.object({
   cursor: idSchema.optional(),

@@ -16,6 +16,8 @@ import type {
   UserProfile,
   IConversation,
   PresenceUpdatePayload,
+  MessageAttachment,
+  MessageType,
 } from '@chatlock/shared-types';
 
 export interface UseChatReturn {
@@ -28,7 +30,7 @@ export interface UseChatReturn {
   isRefreshing: boolean;
   isPeerTyping: boolean;
   error: Error | null;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (content: string, attachments?: MessageAttachment[]) => Promise<void>;
   retryMessage: (clientMessageId: string) => Promise<void>;
   startTyping: () => void;
   stopTyping: () => void;
@@ -342,8 +344,11 @@ export function useChat(conversationId: string): UseChatReturn {
 
   // 9. Send message with offline-first durable outbox queue
   const sendMessage = useCallback(
-    async (content: string) => {
-      if (!content.trim() || !conversationId) return;
+    async (content: string, attachments?: MessageAttachment[]) => {
+      const hasContent = content.trim().length > 0;
+      const hasAttachments = Boolean(attachments && attachments.length > 0);
+
+      if ((!hasContent && !hasAttachments) || !conversationId) return;
 
       // Stop typing immediately upon send
       socketManager.stopTyping(conversationId);
@@ -351,13 +356,23 @@ export function useChat(conversationId: string): UseChatReturn {
       const clientMessageId = generateClientMessageId();
       const isConnected = socketManager.isConnected() && isNetworkOnline;
 
+      let msgType: MessageType = 'text';
+      if (attachments && attachments.length > 0) {
+        const first = attachments[0];
+        if (first?.mimeType.startsWith('image/')) msgType = 'image';
+        else if (first?.mimeType.startsWith('video/')) msgType = 'video';
+        else if (first?.mimeType.startsWith('audio/')) msgType = 'audio';
+        else msgType = 'file';
+      }
+
       const outboxItem: OutboxMessage = {
         conversationId,
         senderId: currentUserId,
         sender: currentUser ?? undefined,
         clientMessageId,
-        type: 'text',
+        type: msgType,
         content: content.trim(),
+        attachments: hasAttachments ? attachments : undefined,
         status: isConnected ? 'sending' : 'pending',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

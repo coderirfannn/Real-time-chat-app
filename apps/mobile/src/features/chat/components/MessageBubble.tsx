@@ -1,7 +1,8 @@
-import React, { memo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import React, { memo, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Image, Linking } from 'react-native';
 import { formatMessageTime } from '../../../utils/date-formatter';
 import type { LocalMessage, DeliveryStatus } from '../../../types/chat.types';
+import type { MessageAttachment } from '@chatlock/shared-types';
 
 export interface MessageBubbleProps {
   message: LocalMessage;
@@ -37,6 +38,21 @@ function renderStatusIndicator(
   }
 }
 
+function getFileIcon(mimeType: string): string {
+  if (mimeType.startsWith('image/')) return '🖼️';
+  if (mimeType.startsWith('video/')) return '🎬';
+  if (mimeType.startsWith('audio/')) return '🎵';
+  if (mimeType.includes('pdf')) return '📕';
+  if (mimeType.includes('zip')) return '📦';
+  return '📄';
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export const MessageBubble = memo(function MessageBubble({
   message,
   isOutbound,
@@ -46,6 +62,13 @@ export const MessageBubble = memo(function MessageBubble({
 }: MessageBubbleProps): React.JSX.Element {
   const timeText = formatMessageTime(message.createdAt);
   const isFailed = message.status === 'failed';
+  const attachments = message.attachments || [];
+
+  const handleOpenAttachment = useCallback((att: MessageAttachment) => {
+    if (att.url) {
+      Linking.openURL(att.url).catch(() => {});
+    }
+  }, []);
 
   return (
     <View
@@ -62,9 +85,63 @@ export const MessageBubble = memo(function MessageBubble({
           isFailed ? styles.failedBubble : null,
         ]}
       >
-        <Text style={[styles.text, isOutbound ? styles.outboundText : styles.inboundText]}>
-          {message.content}
-        </Text>
+        {/* Attachments Section */}
+        {attachments.length > 0 && (
+          <View style={styles.attachmentsContainer}>
+            {attachments.map((att, index) => {
+              const isImage = att.mimeType?.startsWith('image/');
+              if (isImage) {
+                return (
+                  <TouchableOpacity
+                    key={att.id || `att_${index}`}
+                    activeOpacity={0.85}
+                    onPress={() => handleOpenAttachment(att)}
+                    style={styles.imageWrapper}
+                  >
+                    <Image
+                      source={{ uri: att.url }}
+                      style={styles.attachmentImage}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                );
+              }
+
+              return (
+                <TouchableOpacity
+                  key={att.id || `att_${index}`}
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenAttachment(att)}
+                  style={[
+                    styles.fileCard,
+                    isOutbound ? styles.fileCardOutbound : styles.fileCardInbound,
+                  ]}
+                >
+                  <Text style={styles.fileIcon}>{getFileIcon(att.mimeType || '')}</Text>
+                  <View style={styles.fileDetails}>
+                    <Text
+                      style={[
+                        styles.fileName,
+                        isOutbound ? styles.fileNameOutbound : styles.fileNameInbound,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {att.name}
+                    </Text>
+                    <Text style={styles.fileSize}>{formatFileSize(att.size || 0)}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Text Content */}
+        {Boolean(message.content) && (
+          <Text style={[styles.text, isOutbound ? styles.outboundText : styles.inboundText]}>
+            {message.content}
+          </Text>
+        )}
 
         <View style={styles.metaRow}>
           {showTime && <Text style={styles.timeText}>{timeText}</Text>}
@@ -99,10 +176,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   bubble: {
-    maxWidth: '78%',
+    maxWidth: '82%',
     borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     ...Platform.select({
       web: {
         boxShadow: '0 1px 2px rgba(0, 0, 0, 0.15)',
@@ -129,6 +206,57 @@ const styles = StyleSheet.create({
   failedBubble: {
     borderColor: '#EF4444',
     borderWidth: 1,
+  },
+  attachmentsContainer: {
+    gap: 6,
+    marginBottom: 4,
+  },
+  imageWrapper: {
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#0F172A',
+  },
+  attachmentImage: {
+    width: 220,
+    height: 160,
+    borderRadius: 10,
+  },
+  fileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 8,
+    gap: 8,
+    maxWidth: 220,
+  },
+  fileCardOutbound: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  fileCardInbound: {
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  fileIcon: {
+    fontSize: 20,
+  },
+  fileDetails: {
+    flex: 1,
+  },
+  fileName: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  fileNameOutbound: {
+    color: '#FFFFFF',
+  },
+  fileNameInbound: {
+    color: '#F8FAFC',
+  },
+  fileSize: {
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginTop: 2,
   },
   text: {
     fontSize: 15,

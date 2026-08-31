@@ -96,6 +96,7 @@ export default function ChatScreen(): React.JSX.Element {
         )}
 
         <MessageComposer
+          conversationId={conversationId}
           onSendMessage={sendMessage}
           onTypingStart={startTyping}
           onTypingStop={stopTyping}

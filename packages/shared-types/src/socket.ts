@@ -1,5 +1,5 @@
 import type { ID } from './common.js';
-import type { IMessage, MessageType } from './chat.js';
+import type { IMessage, MessageType, MessageAttachment } from './chat.js';
 import type { UserStatus } from './user.js';
 import type { ReceiptStatus } from './receipt.js';
 
@@ -41,6 +41,7 @@ export interface SendMessagePayload {
   clientMessageId: string;
   content: string;
   type?: MessageType;
+  attachments?: MessageAttachment[];
   replyToMessageId?: ID;
   tempId?: string;
 }

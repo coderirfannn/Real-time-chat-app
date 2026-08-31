@@ -75,8 +75,10 @@ export class MessageService {
       conversationId: cleanConvId,
       senderId: cleanSenderId,
       clientMessageId,
-      type: payload.type || 'text',
-      content: payload.content,
+      type:
+        payload.type || (payload.attachments && payload.attachments.length > 0 ? 'image' : 'text'),
+      content: payload.content || '',
+      attachments: payload.attachments,
       replyToMessageId: payload.replyToMessageId,
     });
 

@@ -125,7 +125,8 @@ export class OutboxSyncManager {
         conversationId: retryPayload.conversationId,
         clientMessageId: retryPayload.clientMessageId,
         content: retryPayload.content,
-        type: 'text',
+        type: message.type || 'text',
+        attachments: message.attachments,
       });
 
       if (ack.success) {

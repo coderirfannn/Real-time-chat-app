@@ -7,6 +7,8 @@ export type MessageType = 'text' | 'image' | 'file' | 'audio' | 'video' | 'syste
 
 export type MessageDeliveryStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
 
+export type AttachmentUploadStatus = 'uploading' | 'uploaded' | 'failed';
+
 export interface MessageReaction {
   emoji: string;
   userId: ID;
@@ -16,11 +18,15 @@ export interface MessageReaction {
 export interface MessageAttachment {
   id: ID;
   url: string;
+  key?: string;
   name: string;
   size: number;
   mimeType: string;
   thumbnailUrl?: string;
   duration?: number;
+  width?: number;
+  height?: number;
+  uploadStatus?: AttachmentUploadStatus;
 }
 
 export interface IMessage extends Timestamps {
