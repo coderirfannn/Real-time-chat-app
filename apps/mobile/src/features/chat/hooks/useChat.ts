@@ -1,12 +1,18 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { conversationApi } from '../../../services/api/conversation.api';
 import { socketManager } from '../../../services/socket/socket.manager';
+import { useSocketStore } from '../../../store/socket.store';
 import { useAuthStore } from '../../../store/auth.store';
 import { buildInvertedChatFeed } from '../../../utils/message-grouper';
 import { reconcileChatMessages } from '../../../utils/message-reconciler';
 import type { LocalMessage, ChatFeedItem } from '../../../types/chat.types';
-import type { IMessage, MessageAckResponse, UserProfile } from '@chatlock/shared-types';
+import type {
+  IMessage,
+  MessageAckResponse,
+  UserProfile,
+  IConversation,
+} from '@chatlock/shared-types';
 
 export interface UseChatReturn {
   feedItems: ChatFeedItem[];
@@ -15,11 +21,13 @@ export interface UseChatReturn {
   isSending: boolean;
   isFetchingNextPage: boolean;
   hasNextPage: boolean;
+  isRefreshing: boolean;
   error: Error | null;
   sendMessage: (content: string) => Promise<void>;
   retryMessage: (clientMessageId: string) => Promise<void>;
   loadMoreMessages: () => void;
   refetchHistory: () => Promise<unknown>;
+  refresh: () => Promise<void>;
 }
 
 function generateClientMessageId(): string {
@@ -27,12 +35,15 @@ function generateClientMessageId(): string {
 }
 
 export function useChat(conversationId: string): UseChatReturn {
+  const queryClient = useQueryClient();
   const currentUser = useAuthStore((state) => state.user);
   const currentUserId = currentUser?.id || '';
+  const socketConnectionState = useSocketStore((state) => state.connectionState);
 
   const [socketMessages, setSocketMessages] = useState<LocalMessage[]>([]);
   const [optimisticMessages, setOptimisticMessages] = useState<LocalMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // 1. Fetch conversation details (participants & recipient)
   const { data: convData, isLoading: isLoadingConv } = useQuery({
@@ -41,7 +52,7 @@ export function useChat(conversationId: string): UseChatReturn {
     enabled: Boolean(conversationId && currentUserId),
   });
 
-  // 2. Fetch message history with Cursor Pagination
+  // 2. Fetch message history with Cursor Pagination (latest 50 first)
   const {
     data: infiniteHistory,
     isLoading: isLoadingHistory,
@@ -101,7 +112,14 @@ export function useChat(conversationId: string): UseChatReturn {
     };
   }, [conversationId]);
 
-  // 4. Socket Listeners: onNewMessage & onMessageSent with safe reconciliation
+  // 4. Reconnection Gap Synchronization: automatically refetch latest history on reconnection
+  useEffect(() => {
+    if (socketConnectionState === 'connected' && conversationId) {
+      refetchHistory().catch(() => {});
+    }
+  }, [socketConnectionState, conversationId, refetchHistory]);
+
+  // 5. Socket Listeners: onNewMessage & onMessageSent with cache reconciliation
   useEffect(() => {
     const unsubNew = socketManager.onNewMessage((newMsg: IMessage) => {
       if (newMsg.conversationId !== conversationId) return;
@@ -131,6 +149,21 @@ export function useChat(conversationId: string): UseChatReturn {
         }
         return [...prev, formattedMsg];
       });
+
+      // Update global conversations query cache to reflect the newest message in list view
+      queryClient.setQueryData<IConversation[]>(['conversations'], (oldConvs) => {
+        if (!oldConvs) return oldConvs;
+        return oldConvs.map((c) => {
+          if (c.id === conversationId) {
+            return {
+              ...c,
+              lastMessage: newMsg,
+              lastMessageAt: newMsg.createdAt,
+            };
+          }
+          return c;
+        });
+      });
     });
 
     const unsubSent = socketManager.onMessageSent((ack: MessageAckResponse) => {
@@ -154,9 +187,9 @@ export function useChat(conversationId: string): UseChatReturn {
       unsubNew();
       unsubSent();
     };
-  }, [conversationId]);
+  }, [conversationId, queryClient]);
 
-  // 5. Send message with optimistic local state
+  // 6. Send message with optimistic local state
   const sendMessage = useCallback(
     async (content: string) => {
       if (!content.trim() || !conversationId) return;
@@ -218,7 +251,7 @@ export function useChat(conversationId: string): UseChatReturn {
     [conversationId, currentUser, currentUserId],
   );
 
-  // 6. Retry failed message
+  // 7. Retry failed message
   const retryMessage = useCallback(
     async (clientMessageId: string) => {
       const target = optimisticMessages.find((m) => m.clientMessageId === clientMessageId);
@@ -257,14 +290,24 @@ export function useChat(conversationId: string): UseChatReturn {
     [optimisticMessages],
   );
 
-  // 7. Load older messages (upward pagination)
+  // 8. Load older messages (upward pagination)
   const loadMoreMessages = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
       fetchNextPage();
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // 8. Reconcile history pages with socket and optimistic messages
+  // 9. Pull-to-refresh / full synchronization
+  const refresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await refetchHistory();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetchHistory]);
+
+  // 10. Reconcile history pages with socket and optimistic messages
   const allMessages: LocalMessage[] = useMemo(() => {
     return reconcileChatMessages({
       historyPages: infiniteHistory?.pages,
@@ -273,7 +316,7 @@ export function useChat(conversationId: string): UseChatReturn {
     });
   }, [infiniteHistory?.pages, socketMessages, optimisticMessages]);
 
-  // 9. Build inverted feed items
+  // 11. Build inverted feed items
   const feedItems = useMemo(
     () => buildInvertedChatFeed(allMessages, currentUserId),
     [allMessages, currentUserId],
@@ -286,10 +329,12 @@ export function useChat(conversationId: string): UseChatReturn {
     isSending,
     isFetchingNextPage: Boolean(isFetchingNextPage),
     hasNextPage: Boolean(hasNextPage),
+    isRefreshing,
     error: (historyError as Error) || null,
     sendMessage,
     retryMessage,
     loadMoreMessages,
     refetchHistory,
+    refresh,
   };
 }

@@ -10,6 +10,8 @@ export interface MessageListProps {
   items: ChatFeedItem[];
   isTyping?: boolean;
   isLoadingMore?: boolean;
+  refreshing?: boolean;
+  onRefresh?: () => void;
   onLoadMore?: () => void;
   onRetryMessage?: (clientMessageId: string) => void;
 }
@@ -18,6 +20,8 @@ export const MessageList = memo(function MessageList({
   items,
   isTyping = false,
   isLoadingMore = false,
+  refreshing = false,
+  onRefresh,
   onLoadMore,
   onRetryMessage,
 }: MessageListProps): React.JSX.Element {
@@ -69,6 +73,8 @@ export const MessageList = memo(function MessageList({
       ListFooterComponent={renderTopFooter}
       onEndReached={onLoadMore}
       onEndReachedThreshold={0.3}
+      refreshing={refreshing}
+      onRefresh={onRefresh}
       showsVerticalScrollIndicator={false}
       initialNumToRender={20}
       maxToRenderPerBatch={15}

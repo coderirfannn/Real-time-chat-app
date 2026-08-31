@@ -27,9 +27,11 @@ export default function ChatScreen(): React.JSX.Element {
     isLoading,
     isSending,
     isFetchingNextPage,
+    isRefreshing,
     sendMessage,
     retryMessage,
     loadMoreMessages,
+    refresh,
   } = useChat(conversationId);
 
   const handleBack = useCallback(() => {
@@ -71,6 +73,8 @@ export default function ChatScreen(): React.JSX.Element {
           <MessageList
             items={feedItems}
             isLoadingMore={isFetchingNextPage}
+            refreshing={isRefreshing}
+            onRefresh={refresh}
             onLoadMore={loadMoreMessages}
             onRetryMessage={retryMessage}
           />
