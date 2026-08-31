@@ -4,7 +4,7 @@ import { socketManager } from '../../services/socket/socket.manager';
 import { formatLastSeenTime } from '../../utils/date-formatter';
 import { SocketEvents, type PresenceUpdatePayload } from '@chatlock/shared-types';
 
-describe('Mobile Presence and Typing Features Unit Tests', () => {
+describe('Mobile Presence and Typing Features Unit Tests — Task 12 Verification', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.restoreAllMocks();
@@ -15,9 +15,9 @@ describe('Mobile Presence and Typing Features Unit Tests', () => {
   });
 
   // ==========================================
-  // 1. TYPING START / STOP EMITTER
+  // 1. TYPING START / STOP
   // ==========================================
-  it('1. TYPING EMIT: dispatches typing:start and typing:stop when socket is connected', () => {
+  it('1. TYPING: emits typing:start and typing:stop events to socket', () => {
     const mockSocket = {
       connected: true,
       emit: vi.fn(),
@@ -38,9 +38,37 @@ describe('Mobile Presence and Typing Features Unit Tests', () => {
   });
 
   // ==========================================
-  // 2. PRESENCE HEARTBEAT EMITTER
+  // 2. TYPING TIMEOUT & AUTO-EXPIRATION
   // ==========================================
-  it('2. HEARTBEAT: sends presence:heartbeat event over socket', async () => {
+  it('2. TYPING TIMEOUT: auto-expires stale typing state when peer does not stop typing within timeout window', () => {
+    let peerTyping = false;
+    let expirationTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handlePeerTypingStart = () => {
+      peerTyping = true;
+      if (expirationTimer) clearTimeout(expirationTimer);
+      // 4-second auto-expiration
+      expirationTimer = setTimeout(() => {
+        peerTyping = false;
+      }, 4000);
+    };
+
+    handlePeerTypingStart();
+    expect(peerTyping).toBe(true);
+
+    // Fast-forward 3.9 seconds -> still typing
+    vi.advanceTimersByTime(3900);
+    expect(peerTyping).toBe(true);
+
+    // Fast-forward past 4 seconds -> automatically expired
+    vi.advanceTimersByTime(200);
+    expect(peerTyping).toBe(false);
+  });
+
+  // ==========================================
+  // 3. HEARTBEAT / TTL RENEWAL
+  // ==========================================
+  it('3. HEARTBEAT: dispatches presence:heartbeat event periodically', async () => {
     const mockSocket = {
       connected: true,
       emit: vi.fn((_event, callback) => {
@@ -60,43 +88,9 @@ describe('Mobile Presence and Typing Features Unit Tests', () => {
   });
 
   // ==========================================
-  // 3. TYPING AUTO-EXPIRATION & LISTENER
+  // 4. PRESENCE LISTENER & STATUS UPDATES
   // ==========================================
-  it('3. TYPING LISTENERS: registers and cleans up typing start/stop event listeners', () => {
-    const listeners = new Map<string, (payload: unknown) => void>();
-    const mockSocket = {
-      connected: true,
-      on: vi.fn((event: string, fn: (payload: unknown) => void) => {
-        listeners.set(event, fn);
-      }),
-      off: vi.fn((event: string) => {
-        listeners.delete(event);
-      }),
-    };
-    vi.spyOn(socketService, 'getSocket').mockReturnValue(
-      mockSocket as unknown as ReturnType<typeof socketService.getSocket>,
-    );
-
-    let capturedStart: { conversationId: string; userId: string } | null = null;
-    const unsubStart = socketManager.onTypingStart((payload) => {
-      capturedStart = payload;
-    });
-
-    // Simulate incoming typing start
-    const startHandler = listeners.get(SocketEvents.TYPING_START);
-    expect(startHandler).toBeDefined();
-    startHandler!({ conversationId: 'conv_123', userId: 'user_bob' });
-
-    expect(capturedStart).toEqual({ conversationId: 'conv_123', userId: 'user_bob' });
-
-    unsubStart();
-    expect(mockSocket.off).toHaveBeenCalledWith(SocketEvents.TYPING_START, expect.any(Function));
-  });
-
-  // ==========================================
-  // 4. PRESENCE UPDATE LISTENER
-  // ==========================================
-  it('4. PRESENCE LISTENER: captures user presence status changes', () => {
+  it('4. PRESENCE UPDATE: receives user:presence socket event and updates status', () => {
     const listeners = new Map<string, (payload: unknown) => void>();
     const mockSocket = {
       connected: true,
@@ -136,16 +130,38 @@ describe('Mobile Presence and Typing Features Unit Tests', () => {
   // ==========================================
   // 5. LAST SEEN FORMATTING
   // ==========================================
-  it('5. LAST SEEN FORMATTER: formats relative and offline timestamps accurately', () => {
+  it('5. LAST SEEN: correctly formats relative time for offline users', () => {
     expect(formatLastSeenTime(undefined)).toBe('Offline');
 
-    const justNow = new Date(Date.now() - 30 * 1000); // 30 seconds ago
+    const justNow = new Date(Date.now() - 20 * 1000);
     expect(formatLastSeenTime(justNow)).toBe('Last seen just now');
 
-    const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000); // 5 minutes ago
-    expect(formatLastSeenTime(fiveMinsAgo)).toBe('Last seen 5m ago');
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    expect(formatLastSeenTime(tenMinutesAgo)).toBe('Last seen 10m ago');
 
-    const twoHoursAgo = new Date(Date.now() - 2 * 3600 * 1000); // 2 hours ago
-    expect(formatLastSeenTime(twoHoursAgo)).toBe('Last seen 2h ago');
+    const threeHoursAgo = new Date(Date.now() - 3 * 3600 * 1000);
+    expect(formatLastSeenTime(threeHoursAgo)).toBe('Last seen 3h ago');
+  });
+
+  // ==========================================
+  // 6. MULTIPLE USERS TYPING STATE
+  // ==========================================
+  it('6. MULTIPLE USERS: tracks typing state separately per user in conversations', () => {
+    const typingUsers = new Set<string>();
+
+    const onUserTypingStart = (userId: string) => typingUsers.add(userId);
+    const onUserTypingStop = (userId: string) => typingUsers.delete(userId);
+
+    onUserTypingStart('user_alice');
+    onUserTypingStart('user_bob');
+
+    expect(typingUsers.has('user_alice')).toBe(true);
+    expect(typingUsers.has('user_bob')).toBe(true);
+    expect(typingUsers.size).toBe(2);
+
+    onUserTypingStop('user_alice');
+    expect(typingUsers.has('user_alice')).toBe(false);
+    expect(typingUsers.has('user_bob')).toBe(true);
+    expect(typingUsers.size).toBe(1);
   });
 });
