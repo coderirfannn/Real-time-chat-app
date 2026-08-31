@@ -1,8 +1,8 @@
 # BRAIN.md — ChatLock Platform Architecture & System Design
 
 **Project**: ChatLock — Production-Grade Real-Time Messaging Platform  
-**Version**: 0.15.0 (Production Industry-Grade Hardening & Security Fortification Completed)  
-**Status**: Production Industry-Grade Architecture, Zero-Trust Security, and Multi-Node Cluster Ready
+**Version**: 0.15.1 (Production Hardening, Fault-Tolerant Redis Fallback & Zero-Trust Security Fortified)  
+**Status**: Production Industry-Grade Architecture, Fault-Tolerant Real-Time Pipeline, and Multi-Node Cluster Ready
 
 ---
 
@@ -16,7 +16,7 @@ ChatLock is a secure, high-concurrency, real-time messaging platform built for c
 2. **Layered Backend Decoupling**: Unidirectional request flow (`controller -> service -> repository -> database`) preventing route pollution.
 3. **Type Safety & Schema Integrity**: End-to-end TypeScript strict mode, Zod runtime validation, and shared contract types.
 4. **Secret Isolation**: Guaranteed separation preventing backend credentials or private tokens from leaking into client bundles (`EXPO_PUBLIC_` filtering).
-5. **Horizontal Multi-Node Scaling**: Socket.IO `@socket.io/redis-adapter` for distributed cross-node message and presence broadcasting.
+5. **Horizontal Multi-Node Scaling & Fault Tolerance**: Socket.IO `@socket.io/redis-adapter` for distributed cross-node message and presence broadcasting with zero-crash in-memory fallback during Redis unavailability.
 6. **Zero-Trust Security & NoSQL Sanitization**: Global operator stripping (`$` and `.`) on all inputs, constant-time timing-attack mitigation on login, and sliding-window rate limiting on socket duplex events.
 7. **Token Reuse Detection & Family Revocation**: OAuth2 RFC 6819 refresh token rotation with automatic theft detection and full user session invalidation.
 8. **Offline-First Reliability**: Persistent outbox storage, exponential backoff retries with jitter, idempotency deduplication (`clientMessageId`), and lifecycle foreground reconciliation.
@@ -46,7 +46,7 @@ ChatLock/
 │       ├── services/       # Domain business logic (Auth, Conversation, Message, Presence, Receipt)
 │       ├── repositories/   # Decoupled persistence access layer (User, Conv, Message, MessageReceipt, Session, Device)
 │       ├── database/       # MongoDB connection lifecycle management
-│       ├── redis/          # Redis connection lifecycle management
+│       ├── redis/          # Redis connection lifecycle management & fault tolerance
 │       ├── socket/         # Socket.IO gateway, connection, room, messaging, typing, presence, receipts, rate limiter
 │       ├── middleware/     # Security, Request ID, sanitize, logging, validation, error handlers
 │       ├── errors/         # Stable error codes and AppError hierarchy
