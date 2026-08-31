@@ -16,6 +16,8 @@ function renderStatusIndicator(
   onRetry?: () => void,
 ): React.JSX.Element | null {
   switch (status) {
+    case 'pending':
+      return <Text style={styles.statusPending}>⏳</Text>;
     case 'sending':
       return <Text style={styles.statusSending}>🕒</Text>;
     case 'sent':
@@ -144,6 +146,10 @@ const styles = StyleSheet.create({
   },
   statusWrapper: {
     marginLeft: 2,
+  },
+  statusPending: {
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.65)',
   },
   statusSending: {
     fontSize: 10,

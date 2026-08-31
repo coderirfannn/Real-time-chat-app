@@ -5,7 +5,29 @@ import type {
   MessageReaction,
 } from '@chatlock/shared-types';
 
-export type DeliveryStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+export type DeliveryStatus = 'pending' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+
+export interface OutboxMessage {
+  clientMessageId: string;
+  conversationId: string;
+  senderId: string;
+  sender?: UserProfile;
+  content: string;
+  type?: MessageType;
+  attachments?: MessageAttachment[];
+  status: DeliveryStatus;
+  createdAt: string;
+  updatedAt: string;
+  attempts: number;
+  lastAttemptAt?: string;
+  lastError?: string;
+  isRetryable?: boolean;
+  retryPayload: {
+    conversationId: string;
+    content: string;
+    clientMessageId: string;
+  };
+}
 
 export interface LocalMessage {
   id?: string;

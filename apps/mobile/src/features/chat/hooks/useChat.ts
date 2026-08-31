@@ -2,11 +2,14 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { conversationApi } from '../../../services/api/conversation.api';
 import { socketManager } from '../../../services/socket/socket.manager';
+import { outboxService } from '../../../services/outbox/outbox.service';
+import { outboxSyncManager } from '../../../services/outbox/outbox-sync.manager';
 import { useSocketStore } from '../../../store/socket.store';
+import { useAppStore } from '../../../store/app.store';
 import { useAuthStore } from '../../../store/auth.store';
 import { buildInvertedChatFeed } from '../../../utils/message-grouper';
 import { reconcileChatMessages } from '../../../utils/message-reconciler';
-import type { LocalMessage, ChatFeedItem } from '../../../types/chat.types';
+import type { LocalMessage, OutboxMessage, ChatFeedItem } from '../../../types/chat.types';
 import type {
   IMessage,
   MessageAckResponse,
@@ -39,9 +42,10 @@ export function useChat(conversationId: string): UseChatReturn {
   const currentUser = useAuthStore((state) => state.user);
   const currentUserId = currentUser?.id || '';
   const socketConnectionState = useSocketStore((state) => state.connectionState);
+  const isNetworkOnline = useAppStore((state) => state.isOnline);
 
   const [socketMessages, setSocketMessages] = useState<LocalMessage[]>([]);
-  const [optimisticMessages, setOptimisticMessages] = useState<LocalMessage[]>([]);
+  const [outboxMessages, setOutboxMessages] = useState<OutboxMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -76,6 +80,20 @@ export function useChat(conversationId: string): UseChatReturn {
     staleTime: 60 * 1000,
   });
 
+  // 3. Outbox subscription: load and listen to persistent outbox queue for this conversation
+  useEffect(() => {
+    if (!conversationId) return;
+
+    const unsubOutbox = outboxService.subscribe((allOutbox) => {
+      const convOutbox = allOutbox.filter((m) => m.conversationId === conversationId);
+      setOutboxMessages(convOutbox);
+    });
+
+    return () => {
+      unsubOutbox();
+    };
+  }, [conversationId]);
+
   // Extract recipient info
   const recipient: UserProfile = useMemo(() => {
     if (!convData) {
@@ -101,7 +119,7 @@ export function useChat(conversationId: string): UseChatReturn {
     return { id: 'peer', username: 'Chat', displayName: 'Conversation', status: 'offline' };
   }, [convData, currentUserId]);
 
-  // 3. Socket Room Lifecycle: Join on mount, leave on unmount
+  // 4. Socket Room Lifecycle: Join on mount, leave on unmount
   useEffect(() => {
     if (!conversationId) return;
 
@@ -112,14 +130,15 @@ export function useChat(conversationId: string): UseChatReturn {
     };
   }, [conversationId]);
 
-  // 4. Reconnection Gap Synchronization: automatically refetch latest history on reconnection
+  // 5. Reconnection Gap Synchronization: automatically refetch history and drain outbox on connect
   useEffect(() => {
     if (socketConnectionState === 'connected' && conversationId) {
       refetchHistory().catch(() => {});
+      outboxSyncManager.processQueue().catch(() => {});
     }
   }, [socketConnectionState, conversationId, refetchHistory]);
 
-  // 5. Socket Listeners: onNewMessage & onMessageSent with cache reconciliation
+  // 6. Socket Listeners: onNewMessage & onMessageSent with cache reconciliation
   useEffect(() => {
     const unsubNew = socketManager.onNewMessage((newMsg: IMessage) => {
       if (newMsg.conversationId !== conversationId) return;
@@ -150,7 +169,7 @@ export function useChat(conversationId: string): UseChatReturn {
         return [...prev, formattedMsg];
       });
 
-      // Update global conversations query cache to reflect the newest message in list view
+      // Update global conversations query cache
       queryClient.setQueryData<IConversation[]>(['conversations'], (oldConvs) => {
         if (!oldConvs) return oldConvs;
         return oldConvs.map((c) => {
@@ -169,18 +188,8 @@ export function useChat(conversationId: string): UseChatReturn {
     const unsubSent = socketManager.onMessageSent((ack: MessageAckResponse) => {
       if (!ack.clientMessageId) return;
 
-      setOptimisticMessages((prev) =>
-        prev.map((m) => {
-          if (m.clientMessageId === ack.clientMessageId) {
-            return {
-              ...m,
-              id: ack.serverMessageId || m.id,
-              status: ack.success ? ('sent' as const) : ('failed' as const),
-            };
-          }
-          return m;
-        }),
-      );
+      // Dequeue from outbox service upon server ACK
+      outboxService.dequeue(ack.clientMessageId).catch(() => {});
     });
 
     return () => {
@@ -189,22 +198,25 @@ export function useChat(conversationId: string): UseChatReturn {
     };
   }, [conversationId, queryClient]);
 
-  // 6. Send message with optimistic local state
+  // 7. Send message with offline-first durable outbox queue
   const sendMessage = useCallback(
     async (content: string) => {
       if (!content.trim() || !conversationId) return;
 
       const clientMessageId = generateClientMessageId();
-      const optimisticMessage: LocalMessage = {
+      const isConnected = socketManager.isConnected() && isNetworkOnline;
+
+      const outboxItem: OutboxMessage = {
         conversationId,
         senderId: currentUserId,
         sender: currentUser ?? undefined,
         clientMessageId,
         type: 'text',
         content: content.trim(),
-        status: 'sending',
+        status: isConnected ? 'sending' : 'pending',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        attempts: 0,
         retryPayload: {
           conversationId,
           content: content.trim(),
@@ -212,111 +224,57 @@ export function useChat(conversationId: string): UseChatReturn {
         },
       };
 
-      setOptimisticMessages((prev) => [...prev, optimisticMessage]);
-      setIsSending(true);
+      // 1. Save to durable persistent storage immediately
+      await outboxService.enqueue(outboxItem);
 
-      try {
-        const ack = await socketManager.sendMessage({
-          conversationId,
-          clientMessageId,
-          content: content.trim(),
-          type: 'text',
-        });
-
-        setOptimisticMessages((prev) =>
-          prev.map((m) => {
-            if (m.clientMessageId === clientMessageId) {
-              return {
-                ...m,
-                id: ack.serverMessageId || m.id,
-                status: ack.success ? 'sent' : 'failed',
-              };
-            }
-            return m;
-          }),
-        );
-      } catch {
-        setOptimisticMessages((prev) =>
-          prev.map((m) => {
-            if (m.clientMessageId === clientMessageId) {
-              return { ...m, status: 'failed' };
-            }
-            return m;
-          }),
-        );
-      } finally {
-        setIsSending(false);
+      // 2. If online and socket connected, attempt immediate delivery
+      if (isConnected) {
+        setIsSending(true);
+        try {
+          await outboxSyncManager.sendMessageWithBackoff(outboxItem);
+        } finally {
+          setIsSending(false);
+        }
       }
     },
-    [conversationId, currentUser, currentUserId],
+    [conversationId, currentUser, currentUserId, isNetworkOnline],
   );
 
-  // 7. Retry failed message
-  const retryMessage = useCallback(
-    async (clientMessageId: string) => {
-      const target = optimisticMessages.find((m) => m.clientMessageId === clientMessageId);
-      if (!target || !target.retryPayload) return;
+  // 8. Retry failed or pending message
+  const retryMessage = useCallback(async (clientMessageId: string) => {
+    await outboxSyncManager.retryMessage(clientMessageId);
+  }, []);
 
-      setOptimisticMessages((prev) =>
-        prev.map((m) => (m.clientMessageId === clientMessageId ? { ...m, status: 'sending' } : m)),
-      );
-
-      try {
-        const ack = await socketManager.sendMessage({
-          conversationId: target.retryPayload.conversationId,
-          clientMessageId: target.retryPayload.clientMessageId,
-          content: target.retryPayload.content,
-          type: 'text',
-        });
-
-        setOptimisticMessages((prev) =>
-          prev.map((m) => {
-            if (m.clientMessageId === clientMessageId) {
-              return {
-                ...m,
-                id: ack.serverMessageId || m.id,
-                status: ack.success ? 'sent' : 'failed',
-              };
-            }
-            return m;
-          }),
-        );
-      } catch {
-        setOptimisticMessages((prev) =>
-          prev.map((m) => (m.clientMessageId === clientMessageId ? { ...m, status: 'failed' } : m)),
-        );
-      }
-    },
-    [optimisticMessages],
-  );
-
-  // 8. Load older messages (upward pagination)
+  // 9. Load older messages (upward pagination)
   const loadMoreMessages = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
       fetchNextPage();
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // 9. Pull-to-refresh / full synchronization
+  // 10. Pull-to-refresh / full synchronization
   const refresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
       await refetchHistory();
+      if (socketManager.isConnected()) {
+        await outboxSyncManager.processQueue();
+      }
     } finally {
       setIsRefreshing(false);
     }
   }, [refetchHistory]);
 
-  // 10. Reconcile history pages with socket and optimistic messages
+  // 11. Reconcile history pages with socket and outbox messages
   const allMessages: LocalMessage[] = useMemo(() => {
     return reconcileChatMessages({
       historyPages: infiniteHistory?.pages,
       socketMessages,
-      optimisticMessages,
+      outboxMessages,
     });
-  }, [infiniteHistory?.pages, socketMessages, optimisticMessages]);
+  }, [infiniteHistory?.pages, socketMessages, outboxMessages]);
 
-  // 11. Build inverted feed items
+  // 12. Build inverted feed items
   const feedItems = useMemo(
     () => buildInvertedChatFeed(allMessages, currentUserId),
     [allMessages, currentUserId],

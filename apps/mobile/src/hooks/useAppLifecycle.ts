@@ -1,0 +1,49 @@
+import { useEffect, useRef } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
+import { useAuthStore } from '../store/auth.store';
+import { socketManager } from '../services/socket/socket.manager';
+import { outboxSyncManager } from '../services/outbox/outbox-sync.manager';
+import { networkService } from '../services/network/network.service';
+
+export function useAppLifecycle(): void {
+  const appState = useRef<AppStateStatus>(AppState.currentState);
+
+  useEffect(() => {
+    // Initialize network listener
+    networkService.initialize();
+
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      const isComingToForeground =
+        /inactive|background/.test(appState.current) && nextAppState === 'active';
+
+      appState.current = nextAppState;
+
+      if (isComingToForeground) {
+        handleAppResume();
+      } else if (nextAppState === 'background') {
+        handleAppBackground();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+}
+
+function handleAppResume(): void {
+  const accessToken = useAuthStore.getState().accessToken;
+
+  // 1. Restore socket connection if disconnected
+  if (accessToken && !socketManager.isConnected()) {
+    socketManager.connect(accessToken);
+  }
+
+  // 2. Drain pending outbox messages
+  outboxSyncManager.processQueue().catch(() => {});
+}
+
+function handleAppBackground(): void {
+  // Clear any scheduled retry timeouts while app is sleeping
+  outboxSyncManager.clearAllTimeouts();
+}

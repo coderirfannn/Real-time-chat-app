@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useAuthStore } from '../src/store/auth.store';
 import { socketManager } from '../src/services/socket/socket.manager';
+import { useAppLifecycle } from '../src/hooks/useAppLifecycle';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,6 +19,8 @@ const queryClient = new QueryClient({
 
 function AuthLifecycleManager({ children }: { children: React.ReactNode }) {
   const { accessToken, isAuthenticated, hydrateAuth } = useAuthStore();
+
+  useAppLifecycle();
 
   useEffect(() => {
     hydrateAuth();

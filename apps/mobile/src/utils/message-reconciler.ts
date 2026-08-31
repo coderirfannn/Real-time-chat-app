@@ -1,18 +1,24 @@
 import type { IMessage } from '@chatlock/shared-types';
-import type { LocalMessage } from '../types/chat.types';
+import type { LocalMessage, OutboxMessage } from '../types/chat.types';
 
 export interface ReconcileOptions {
   historyPages?: Array<{ messages?: IMessage[] } | undefined>;
   socketMessages?: LocalMessage[];
   optimisticMessages?: LocalMessage[];
+  outboxMessages?: Array<LocalMessage | OutboxMessage>;
 }
 
 /**
- * Reconciles REST historical pages, incoming socket messages, and local optimistic messages
- * into a single, deduplicated, chronologically ordered list of LocalMessages.
+ * Reconciles REST historical pages, incoming socket messages, outbox queued messages,
+ * and local optimistic messages into a single, deduplicated, chronologically ordered list of LocalMessages.
  */
 export function reconcileChatMessages(options: ReconcileOptions): LocalMessage[] {
-  const { historyPages = [], socketMessages = [], optimisticMessages = [] } = options;
+  const {
+    historyPages = [],
+    socketMessages = [],
+    optimisticMessages = [],
+    outboxMessages = [],
+  } = options;
 
   // Primary index maps: by server ID and by clientMessageId
   const messageMap = new Map<string, LocalMessage>();
@@ -53,7 +59,7 @@ export function reconcileChatMessages(options: ReconcileOptions): LocalMessage[]
         retryPayload: msg.retryPayload || existing.retryPayload,
         // If existing had an established server ID, preserve it
         id: msg.id || existing.id,
-        // Status resolution: if optimistic was failed, keep failed unless new server message overrides
+        // Status resolution
         status: msg.status || existing.status || 'delivered',
       };
       messageMap.set(key, merged);
@@ -78,12 +84,17 @@ export function reconcileChatMessages(options: ReconcileOptions): LocalMessage[]
     upsertMessage(socketMsg);
   }
 
-  // 3. Process local optimistic/sending messages
+  // 3. Process persistent outbox messages (pending / sending / failed)
+  for (const outboxMsg of outboxMessages) {
+    upsertMessage(outboxMsg as LocalMessage);
+  }
+
+  // 4. Process local optimistic/sending messages
   for (const optMsg of optimisticMessages) {
     upsertMessage(optMsg);
   }
 
-  // 4. Sort chronologically (ascending: oldest to newest)
+  // 5. Sort chronologically (ascending: oldest to newest)
   const result = Array.from(messageMap.values());
   result.sort((a, b) => {
     const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
