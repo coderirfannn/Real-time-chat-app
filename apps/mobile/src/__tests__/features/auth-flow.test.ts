@@ -113,4 +113,36 @@ describe('Mobile Auth Flow & User Search Integration Tests', () => {
     const storedToken = await secureStorage.getItem('access_token');
     expect(storedToken).toBeNull();
   });
+
+  it('5. VALIDATION ERROR HANDLING: ApiClient formats 422 validation detail messages', async () => {
+    const errorBody = {
+      success: false,
+      statusCode: 422,
+      error: 'VALIDATION_ERROR',
+      message: 'Validation failed for request parameters',
+      details: [
+        {
+          path: 'password',
+          message: 'Password must contain at least one lowercase letter',
+          code: 'invalid_string',
+        },
+      ],
+    };
+
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 422,
+      statusText: 'Unprocessable Entity',
+      text: async () => JSON.stringify(errorBody),
+    } as Response);
+
+    await expect(
+      authApi.register({
+        displayName: 'Test User',
+        username: 'testuser',
+        email: 'test@example.com',
+        password: 'PASSWORD123',
+      }),
+    ).rejects.toThrow('Password must contain at least one lowercase letter');
+  });
 });

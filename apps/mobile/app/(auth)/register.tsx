@@ -48,23 +48,29 @@ export default function RegisterScreen(): React.JSX.Element {
       return;
     }
 
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      setErrorMessage('Please enter a valid email address');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!cleanEmail || !emailRegex.test(cleanEmail)) {
+      setErrorMessage('Please enter a valid email address (e.g. name@example.com)');
       return;
     }
 
     if (password.length < 8) {
-      setErrorMessage('Password must be at least 8 characters');
+      setErrorMessage('Password must be at least 8 characters long');
       return;
     }
 
     if (!/[A-Z]/.test(password)) {
-      setErrorMessage('Password must contain at least one uppercase letter');
+      setErrorMessage('Password must contain at least one uppercase letter (A-Z)');
+      return;
+    }
+
+    if (!/[a-z]/.test(password)) {
+      setErrorMessage('Password must contain at least one lowercase letter (a-z)');
       return;
     }
 
     if (!/[0-9]/.test(password)) {
-      setErrorMessage('Password must contain at least one number');
+      setErrorMessage('Password must contain at least one number (0-9)');
       return;
     }
 
@@ -184,7 +190,7 @@ export default function RegisterScreen(): React.JSX.Element {
               <View style={styles.passwordWrapper}>
                 <TextInput
                   style={styles.passwordInput}
-                  placeholder="Min 8 chars, 1 uppercase, 1 number"
+                  placeholder="Min 8 chars, uppercase, lowercase, number"
                   placeholderTextColor="#64748B"
                   value={password}
                   onChangeText={(text) => {

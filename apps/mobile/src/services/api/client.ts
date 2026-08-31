@@ -139,10 +139,32 @@ export class ApiClient {
       }
 
       if (!response.ok) {
-        const errorCode = responseData?.error?.code || `HTTP_${response.status}`;
-        const errorMessage =
-          responseData?.error?.message || response.statusText || 'Request failed';
-        throw new ApiError(errorMessage, response.status, errorCode, responseData?.error?.details);
+        const rawBody = responseData as Record<string, unknown> | null;
+        const errorCode =
+          (typeof rawBody?.error === 'string'
+            ? rawBody.error
+            : (rawBody?.error as Record<string, unknown>)?.code) || `HTTP_${response.status}`;
+
+        let errorMessage =
+          (typeof rawBody?.message === 'string' ? rawBody.message : undefined) ||
+          (typeof rawBody?.error === 'object' && rawBody?.error !== null
+            ? (rawBody.error as Record<string, unknown>).message
+            : undefined) ||
+          response.statusText ||
+          'Request failed';
+
+        const details = rawBody?.details || (rawBody?.error as Record<string, unknown>)?.details;
+
+        if (Array.isArray(details) && details.length > 0) {
+          const detailMessages = details
+            .map((d) => (typeof d === 'object' && d !== null ? (d.message as string) : String(d)))
+            .filter(Boolean);
+          if (detailMessages.length > 0) {
+            errorMessage = detailMessages.join(', ');
+          }
+        }
+
+        throw new ApiError(errorMessage as string, response.status, errorCode as string, details);
       }
 
       if (responseData && typeof responseData === 'object' && 'data' in responseData) {
