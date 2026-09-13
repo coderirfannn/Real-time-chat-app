@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import { View, StyleSheet, Animated, Platform } from 'react-native';
 
 export function TypingIndicator(): React.JSX.Element {
   const dot1 = useRef(new Animated.Value(0.3)).current;
@@ -7,6 +7,7 @@ export function TypingIndicator(): React.JSX.Element {
   const dot3 = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
+    const isNative = Platform.OS !== 'web';
     const createAnimation = (val: Animated.Value, delay: number) =>
       Animated.sequence([
         Animated.delay(delay),
@@ -15,12 +16,12 @@ export function TypingIndicator(): React.JSX.Element {
             Animated.timing(val, {
               toValue: 1,
               duration: 350,
-              useNativeDriver: true,
+              useNativeDriver: isNative,
             }),
             Animated.timing(val, {
               toValue: 0.3,
               duration: 350,
-              useNativeDriver: true,
+              useNativeDriver: isNative,
             }),
           ]),
         ),

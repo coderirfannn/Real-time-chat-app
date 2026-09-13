@@ -13,6 +13,7 @@ import {
   Animated,
   LayoutAnimation,
   UIManager,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -204,6 +205,7 @@ export function MessageComposer({
         mediaTypes: ['images'],
         allowsEditing: false,
         quality: 0.8,
+        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -217,6 +219,7 @@ export function MessageComposer({
           name: filename,
           mimeType,
           size: asset.fileSize || 1024 * 50,
+          base64: asset.base64 || undefined,
           width: asset.width,
           height: asset.height,
         };
@@ -489,7 +492,24 @@ export function MessageComposer({
                 )}
 
                 {item.status === 'failed' && (
-                  <Icon name="alert-circle" size={14} color="#F75555" style={styles.failedBadge} />
+                  <TouchableOpacity
+                    onPress={() =>
+                      Alert.alert(
+                        'Upload Failed',
+                        item.error || 'Media upload could not be completed',
+                      )
+                    }
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="View upload error"
+                  >
+                    <Icon
+                      name="alert-circle"
+                      size={14}
+                      color="#F75555"
+                      style={styles.failedBadge}
+                    />
+                  </TouchableOpacity>
                 )}
 
                 <TouchableOpacity

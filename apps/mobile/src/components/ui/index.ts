@@ -8,3 +8,4 @@ export * from './Input';
 export * from './SearchInput';
 export * from './Card';
 export * from './Icon';
+export * from './MediaPreviewModal';

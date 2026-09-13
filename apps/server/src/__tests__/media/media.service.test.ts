@@ -73,4 +73,29 @@ describe('MediaService — Task 15 Unit Tests', () => {
       }),
     ).rejects.toThrow(ForbiddenError);
   });
+
+  it('3. Instantiates CloudinaryStorageProvider when STORAGE_DRIVER is cloudinary', async () => {
+    vi.resetModules();
+    vi.doMock('../../config/index.js', () => ({
+      config: {
+        storage: {
+          driver: 'cloudinary',
+          cloudinary: {
+            cloudName: 'test-cloud',
+            apiKey: 'test-key',
+            apiSecret: 'test-secret',
+          },
+        },
+        app: { port: 5000 },
+        security: { sessionSecret: 'secret123' },
+      },
+    }));
+
+    const { MediaService: DynamicMediaService } = await import('../../services/media.service.js');
+    const { CloudinaryStorageProvider } =
+      await import('../../storage/cloudinary-storage.provider.js');
+
+    const svc = new DynamicMediaService(mockConvRepo);
+    expect(svc.getStorageProvider()).toBeInstanceOf(CloudinaryStorageProvider);
+  });
 });

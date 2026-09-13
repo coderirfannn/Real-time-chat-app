@@ -11,6 +11,11 @@ import type { ApiResponse } from '@chatlock/shared-types';
 export function createApp(): Express {
   const app = express();
 
+  // Trust first proxy (Render, AWS ALB, Cloudflare)
+  if (config.app.isProduction) {
+    app.set('trust proxy', 1);
+  }
+
   // 1. Request ID attribution
   app.use(requestIdMiddleware);
 

@@ -10,6 +10,16 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.js"
+    },
+    "./mobile": {
+      "types": "./dist/mobile-env.d.ts",
+      "import": "./dist/mobile-env.js",
+      "require": "./dist/mobile-env.js"
+    },
+    "./server": {
+      "types": "./dist/server-env.d.ts",
+      "import": "./dist/server-env.js",
+      "require": "./dist/server-env.js"
     }
   },
   "scripts": {

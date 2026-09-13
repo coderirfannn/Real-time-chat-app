@@ -65,9 +65,15 @@ const messageSchema = new Schema<IMessageDoc>(
     },
     content: {
       type: String,
-      required: [true, 'Message content is required'],
+      default: '',
       trim: true,
       maxlength: [5000, 'Message content cannot exceed 5000 characters'],
+      required: [
+        function (this: IMessageDoc) {
+          return !Array.isArray(this.attachments) || this.attachments.length === 0;
+        },
+        'Message content is required',
+      ],
     },
     attachments: {
       type: [attachmentSchema],

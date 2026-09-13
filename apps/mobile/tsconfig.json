@@ -6,12 +6,13 @@
     "jsx": "react-jsx",
     "noEmit": true,
     "paths": {
-      "@chatlock/shared-types": ["../../packages/shared-types/src"],
-      "@chatlock/shared-types/*": ["../../packages/shared-types/src/*"],
-      "@chatlock/config": ["../../packages/config/src"],
-      "@chatlock/config/*": ["../../packages/config/src/*"],
-      "@chatlock/validation": ["../../packages/validation/src"],
-      "@chatlock/validation/*": ["../../packages/validation/src/*"]
+      "@chatlock/shared-types": ["../../packages/shared-types/dist"],
+      "@chatlock/shared-types/*": ["../../packages/shared-types/dist/*"],
+      "@chatlock/config": ["../../packages/config/dist"],
+      "@chatlock/config/mobile": ["../../packages/config/dist/mobile-env"],
+      "@chatlock/config/*": ["../../packages/config/dist/*"],
+      "@chatlock/validation": ["../../packages/validation/dist"],
+      "@chatlock/validation/*": ["../../packages/validation/dist/*"]
     }
   },
   "include": ["src/**/*", "app.config.ts"],

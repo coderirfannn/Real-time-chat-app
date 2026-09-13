@@ -11,6 +11,8 @@
   },
   "scripts": {
     "build": "pnpm -r run build",
+    "build:web": "pnpm --filter @chatlock/mobile run build:web",
+    "start:server": "pnpm --filter @chatlock/server start",
     "typecheck": "pnpm -r run typecheck",
     "lint": "pnpm -r run lint",
     "lint:fix": "pnpm -r run lint:fix",

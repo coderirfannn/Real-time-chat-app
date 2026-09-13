@@ -1,4 +1,4 @@
-import { parseAndValidateMobileEnv, type MobileConfig } from '@chatlock/config';
+import { parseAndValidateMobileEnv, type MobileConfig } from '@chatlock/config/mobile';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 

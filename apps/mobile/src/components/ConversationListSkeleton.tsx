@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import { View, StyleSheet, Animated, Platform } from 'react-native';
 
 export interface ConversationListSkeletonProps {
   count?: number;
@@ -16,17 +16,18 @@ export function ConversationListSkeleton({
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
 
   useEffect(() => {
+    const isNative = Platform.OS !== 'web';
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 0.85,
           duration: 800,
-          useNativeDriver: true,
+          useNativeDriver: isNative,
         }),
         Animated.timing(pulseAnim, {
           toValue: 0.4,
           duration: 800,
-          useNativeDriver: true,
+          useNativeDriver: isNative,
         }),
       ]),
     );

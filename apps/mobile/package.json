@@ -13,7 +13,8 @@
     "lint": "eslint \"src/**/*.ts*\"",
     "lint:fix": "eslint \"src/**/*.ts*\" --fix",
     "test": "vitest run",
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit",
+    "build:web": "expo export --platform web"
   },
   "dependencies": {
     "@chatlock/config": "workspace:*",

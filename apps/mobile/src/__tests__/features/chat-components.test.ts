@@ -149,4 +149,39 @@ describe('Chat UI Components Unit Tests', () => {
     expect(composer).toBeDefined();
     expect(composer.props.replyingTo?.content).toBe('Quote me!');
   });
+
+  it('renders MessageBubble with image attachment and resolves media url', () => {
+    const mediaMessage: LocalMessage = {
+      id: 'msg-media',
+      conversationId: 'conv-1',
+      senderId: 'peer-1',
+      clientMessageId: 'cm1',
+      type: 'image',
+      content: '',
+      status: 'delivered',
+      attachments: [
+        {
+          id: 'att-1',
+          name: 'photo.jpg',
+          mimeType: 'image/jpeg',
+          size: 1048576,
+          url: 'http://localhost:5000/api/v1/media/files/photo.jpg',
+          uploadStatus: 'uploaded',
+        },
+      ],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const bubble = React.createElement(MessageBubble, {
+      message: mediaMessage,
+      isOutbound: false,
+    });
+
+    expect(bubble).toBeDefined();
+    expect(bubble.props.message.attachments?.[0]?.url).toBe(
+      'http://localhost:5000/api/v1/media/files/photo.jpg',
+    );
+    expect(bubble.props.message.attachments?.[0]?.mimeType).toBe('image/jpeg');
+  });
 });

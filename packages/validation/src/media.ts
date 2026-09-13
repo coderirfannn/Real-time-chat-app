@@ -31,11 +31,15 @@ export const ALL_ALLOWED_MIME_TYPES = [
 export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB max limit
 
 export const messageAttachmentSchema = z.object({
-  id: idSchema.optional().default(() => 'att_' + Date.now()),
+  id: z
+    .string()
+    .min(1, 'Attachment ID cannot be empty')
+    .optional()
+    .default(() => 'att_' + Date.now()),
   url: z.string().min(1, 'Attachment URL is required'),
   key: z.string().optional(),
   name: z.string().min(1).max(255),
-  size: z.number().int().positive().max(MAX_FILE_SIZE_BYTES, 'File exceeds 25MB limit'),
+  size: z.number().positive().max(MAX_FILE_SIZE_BYTES, 'File exceeds 25MB limit'),
   mimeType: z.string().min(1).max(100),
   thumbnailUrl: z.string().optional(),
   duration: z.number().optional(),

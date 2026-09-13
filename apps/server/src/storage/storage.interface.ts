@@ -17,12 +17,13 @@ export interface IStorageProvider {
     mimeType: string;
     size: number;
     expiresInSeconds: number;
+    baseUrl?: string;
   }): Promise<SignedUploadDescriptor>;
 
   /**
    * Returns the publicly accessible URL for a given file key.
    */
-  getPublicUrl(fileKey: string): string;
+  getPublicUrl(fileKey: string, baseUrl?: string): string;
 
   /**
    * Deletes a file from storage by its key.

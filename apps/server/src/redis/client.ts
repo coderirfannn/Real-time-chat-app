@@ -17,9 +17,6 @@ class RedisConnectionManager {
 
   private createClient(): Redis {
     const options: RedisOptions = {
-      host: config.redis.host,
-      port: config.redis.port,
-      password: config.redis.password || undefined,
       keyPrefix: config.redis.keyPrefix,
       lazyConnect: true,
       maxRetriesPerRequest: null,
@@ -39,7 +36,14 @@ class RedisConnectionManager {
       options.tls = {};
     }
 
-    const client = new Redis(options);
+    const client = config.redis.url
+      ? new Redis(config.redis.url, options)
+      : new Redis({
+          host: config.redis.host,
+          port: config.redis.port,
+          password: config.redis.password || undefined,
+          ...options,
+        });
 
     client.on('connect', () => {
       this.state = 'connecting';

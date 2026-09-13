@@ -62,12 +62,14 @@ export class LocalStorageProvider implements IStorageProvider {
     mimeType: string;
     size: number;
     expiresInSeconds: number;
+    baseUrl?: string;
   }): Promise<SignedUploadDescriptor> {
+    const effectiveBaseUrl = (params.baseUrl || this.baseUrl).replace(/\/+$/, '');
     const expires = Date.now() + params.expiresInSeconds * 1000;
     const signature = this.computeSignature(params.fileKey, expires);
 
-    const uploadUrl = `${this.baseUrl}/api/v1/media/upload/${encodeURIComponent(params.fileKey)}?signature=${signature}&expires=${expires}`;
-    const fileUrl = this.getPublicUrl(params.fileKey);
+    const uploadUrl = `${effectiveBaseUrl}/api/v1/media/upload/${encodeURIComponent(params.fileKey)}?signature=${signature}&expires=${expires}`;
+    const fileUrl = this.getPublicUrl(params.fileKey, effectiveBaseUrl);
 
     return {
       uploadUrl,
@@ -82,8 +84,9 @@ export class LocalStorageProvider implements IStorageProvider {
     };
   }
 
-  public getPublicUrl(fileKey: string): string {
-    return `${this.baseUrl}/api/v1/media/files/${encodeURIComponent(fileKey)}`;
+  public getPublicUrl(fileKey: string, baseUrl?: string): string {
+    const effectiveBaseUrl = (baseUrl || this.baseUrl).replace(/\/+$/, '');
+    return `${effectiveBaseUrl}/api/v1/media/files/${encodeURIComponent(fileKey)}`;
   }
 
   private resolveSafeFilePath(fileKey: string): string {

@@ -37,6 +37,7 @@ export function parseAndValidateMobileEnv(
     'JWT_REFRESH_SECRET',
     'SESSION_SECRET',
     'S3_SECRET_KEY',
+    'CLOUDINARY_API_SECRET',
     'FCM_SERVER_KEY',
   ];
 

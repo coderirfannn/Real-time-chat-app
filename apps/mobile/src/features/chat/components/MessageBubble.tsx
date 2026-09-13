@@ -11,9 +11,11 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { formatMessageTime } from '../../../utils/date-formatter';
+import { resolveMediaUrl } from '../../../utils/media-url';
 import { DeliveryReceipt } from './DeliveryReceipt';
 import { ReactionPicker } from './ReactionPicker';
 import { Icon } from '../../../components/ui/Icon';
+import { MediaPreviewModal } from '../../../components/ui/MediaPreviewModal';
 import type { LocalMessage } from '../../../types/chat.types';
 import type { MessageAttachment } from '@chatlock/shared-types';
 
@@ -51,6 +53,7 @@ export const MessageBubble = memo(function MessageBubble({
   const [showPicker, setShowPicker] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<MessageAttachment | null>(null);
 
   const { width: windowWidth } = useWindowDimensions();
   const maxImageWidth = Math.min(Math.max(windowWidth * 0.65, 180), 280);
@@ -61,8 +64,17 @@ export const MessageBubble = memo(function MessageBubble({
   const attachments = message.attachments || [];
 
   const handleOpenAttachment = useCallback((att: MessageAttachment) => {
-    if (att.url) {
-      Linking.openURL(att.url).catch(() => {});
+    const isImg =
+      att.mimeType?.startsWith('image/') ||
+      Boolean(att.name && /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(att.name));
+
+    if (isImg) {
+      setPreviewAttachment(att);
+    } else {
+      const resolved = resolveMediaUrl(att.url);
+      if (resolved) {
+        Linking.openURL(resolved).catch(() => {});
+      }
     }
   }, []);
 
@@ -228,7 +240,11 @@ export const MessageBubble = memo(function MessageBubble({
           {attachments.length > 0 && (
             <View style={styles.attachmentsContainer}>
               {attachments.map((att, index) => {
-                const isImage = att.mimeType?.startsWith('image/');
+                const isImage =
+                  att.mimeType?.startsWith('image/') ||
+                  Boolean(att.name && /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(att.name));
+                const resolvedUrl = resolveMediaUrl(att.url);
+
                 if (isImage) {
                   return (
                     <TouchableOpacity
@@ -238,7 +254,7 @@ export const MessageBubble = memo(function MessageBubble({
                       style={styles.imageWrapper}
                     >
                       <Image
-                        source={{ uri: att.url }}
+                        source={{ uri: resolvedUrl }}
                         style={[
                           styles.attachmentImage,
                           { width: maxImageWidth, height: imageHeight },
@@ -369,6 +385,13 @@ export const MessageBubble = memo(function MessageBubble({
           ))}
         </View>
       )}
+
+      {/* In-App Media Lightbox Modal */}
+      <MediaPreviewModal
+        visible={Boolean(previewAttachment)}
+        attachment={previewAttachment}
+        onClose={() => setPreviewAttachment(null)}
+      />
     </View>
   );
 });

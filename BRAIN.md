@@ -1,7 +1,7 @@
 # BRAIN.md — ChatLock Platform Architecture & System Design
 
 **Project**: ChatLock — Production-Grade Real-Time Messaging Platform  
-**Version**: 0.20.0 (Figma E-Chat Design System Alignment, Cross-Platform SVG Icon Engine, Biometric App Lock, Push Notifications, & Modernized CI/CD)  
+**Version**: 0.22.0 (Production Deployment Preparation, Independent Multi-Target Architecture, Render/Vercel/EAS Blueprints, Zero-Secret Client Bundles, & Public Download Interface)  
 **Status**: Production Industry-Grade Architecture, Fault-Tolerant Real-Time Pipeline, Multi-Node Cluster Ready, and Fully CI/CD Automated
 
 ---
@@ -29,7 +29,8 @@ ChatLock is a secure, high-concurrency, real-time messaging platform built for c
 15. **Biometric Security & App Lock**: `expo-local-authentication` integration with background timeout auto-lock, device PIN/biometric challenge, and secure session management.
 16. **Push Notification Infrastructure**: `expo-notifications` integration, device token registration, notification permissions, foreground banners, and background notification routing.
 17. **Dynamic Viewport & Mobile Keyboard Ergonomics**: Clamped visual viewport (`100dvh`, `visualViewport.height`), flexbox shrink optimization (`minHeight: 0`), dynamic multi-line composer auto-expansion (`38px -> 120px`) with native layout animation, and zero duplicate navigation headers across all stack screens.
-18. **Modernized CI/CD & Automated Quality Gates**: GitHub Actions pipeline on Node.js 22 + pnpm 11, topological build ordering, Prettier code style validation, zero ESLint warnings, 0 TypeScript errors, and 346 automated tests passing across 68 test files.
+18. **Modernized CI/CD & Automated Quality Gates**: GitHub Actions pipeline on Node.js 22 + pnpm 11, topological build ordering, Prettier code style validation, zero ESLint warnings, 0 TypeScript errors, and 354 automated tests passing across 69 test files.
+19. **Cloudinary Cloud Storage Engine**: Enterprise-grade cloud asset storage with SHA-256 HMAC upload signing, binary magic byte integrity enforcement, high-throughput streaming buffer uploads via Cloudinary v2 SDK, secure CDN media distribution, and automatic cloud asset invalidation/deletion.
 
 ---
 
@@ -114,7 +115,7 @@ The environment system strictly validates 13 distinct categories in `@chatlock/c
 4. **JWT**: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN`
 5. **Socket.IO**: `SOCKET_PORT`, `SOCKET_PATH`, `SOCKET_PING_TIMEOUT`, `SOCKET_PING_INTERVAL`, `SOCKET_CORS_ORIGIN`
 6. **Rate Limiting**: `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX_REQUESTS`
-7. **Storage**: `STORAGE_DRIVER`, `STORAGE_LOCAL_PATH`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`
+7. **Storage**: `STORAGE_DRIVER` (`local`, `s3`, `cloudinary`), `STORAGE_LOCAL_PATH`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
 8. **Push Notifications**: `FCM_SERVER_KEY`, `APNS_KEY_ID`, `APNS_TEAM_ID`
 9. **Observability**: `SENTRY_DSN`, `ENABLE_TELEMETRY`, `METRICS_PORT`
 10. **Security**: `BCRYPT_SALT_ROUNDS`, `SESSION_SECRET`, `HELMET_ENABLED`
@@ -180,9 +181,34 @@ The environment system strictly validates 13 distinct categories in `@chatlock/c
   - Restructured pipeline execution order: `pnpm install` -> `pnpm build` -> `format:check` -> `lint` -> `typecheck` -> `test`.
   - Added project path fallbacks in `apps/mobile/tsconfig.json` for resilient source resolution of internal packages.
   - Enforced 100% Prettier compliance and resolved all TypeScript strict lint errors.
-  - Total test count: **346 automated tests passing across 68 test files** (198 server tests + 148 mobile tests).
-- [ ] **Task 22 — End-to-End Encryption (E2EE)**: Pre-key bundles, Signal Protocol / Double Ratchet session management, encrypted payload storage, and cryptographic key rotation.
-- [ ] **Task 23 — Production Observability & Telemetry**: Sentry crash reporting integration, Prometheus metrics exporter, structured audit logging, and automated load testing.
+  - Total test count: **361 automated tests passing across 71 test files** (206 server tests + 148 mobile tests + 7 validation tests).
+- [x] **Task 22 — Cloudinary Cloud Storage Integration**: First-class Cloudinary storage provider (`CloudinaryStorageProvider`) implementing `IStorageProvider`.
+  - Added `'cloudinary'` to `STORAGE_DRIVERS` in `@chatlock/config` with runtime Zod schema parsing for `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET`.
+  - Integrated official `cloudinary` v2 SDK into `apps/server`.
+  - Implemented cryptographic upload descriptor generation (`generateSignedUploadUrl`) with HMAC-SHA256 tokens and 15-minute expiration.
+  - Implemented direct binary buffer streaming to Cloudinary via `cloudinary.v2.uploader.upload_stream` with automatic MIME-type magic-byte inspection.
+  - Implemented public secure CDN delivery URL construction (`getPublicUrl`) and asset destruction (`deleteFile`).
+  - Added transparent backward-compatible cloud redirect in `mediaController.serveLocalFile`.
+  - Configured `.env.example` with storage driver schema and environment variable placeholders.
+  - Comprehensive unit tests covering signed URLs, signature verification, buffer streaming, and deletion (7 tests in `cloudinary-storage.provider.test.ts`, plus dynamic driver selection in `media.service.test.ts`).
+  - **Media Validation Hardening**: Resolved `VALIDATION_ERROR Invalid ObjectId format` during real-time media message dispatch by decoupling `messageAttachmentSchema.id` from MongoDB 24-hex `idSchema` to standard attachment ID strings (`att_<timestamp>_<hash>`), and enabling `replyToMessageId` to gracefully handle empty strings and nulls.
+  - Added comprehensive validation tests in `packages/validation/src/__tests__/media-chat.test.ts`.
+  - **Dynamic Media URL Resolution & In-App Media Lightbox**:
+    - Created `resolveMediaUrl(rawUrl)` in `apps/mobile/src/utils/media-url.ts` to dynamically rewrite `localhost` and `127.0.0.1` URLs (produced by web clients) to the active mobile runtime API origin (`mobileConfig.apiUrl`), allowing images uploaded from web or server storage to render smoothly on mobile devices over LAN.
+    - Created `MediaPreviewModal` in `apps/mobile/src/components/ui/MediaPreviewModal.tsx` providing a full-screen, in-app lightbox with zoom support, loading spinners, failure retry state, and dismiss button so users view images in-app without navigating outside to the device browser.
+    - Integrated `MediaPreviewModal` and `resolveMediaUrl` into `MessageBubble.tsx` and `Avatar.tsx`.
+- [x] **Task 23 — Production Deployment Preparation & Multi-Target Deployment Configuration**:
+  - **Metro Monorepo Resolution Hardening**: Reconfigured `apps/mobile/tsconfig.json` path mappings to point to pre-compiled `dist` distributions of internal packages (`@chatlock/shared-types`, `@chatlock/validation`, `@chatlock/config`), resolving ESM relative `.js` import resolution failures in Metro bundler during web static exports.
+  - **Zero-Secret Client Bundling & Subpath Export Isolation**: Introduced `@chatlock/config/mobile` subpath export isolating client environment validation from backend server schemas. Excluded `server-env.js`, `MONGODB_URI`, `JWT_ACCESS_SECRET`, and default secret strings from mobile and web client bundles, reducing web bundle size by over 100KB. Added `CLOUDINARY_API_SECRET` to client leak guard (`dangerousKeys`).
+  - **Secret Security Sanitization & Git Leak Defense**: Replaced test credentials in `cloudinary-storage.provider.test.ts` with mock strings and sanitized historical mentions. Hardened `.gitignore` with `.env*` wildcard patterns ensuring `.env.production` and `.env.staging` files can never be committed.
+  - **Android & Google Play Readiness**: Added `versionCode: 1` and explicit permission boundaries to `apps/mobile/app.config.ts`, alongside config plugins for `expo-local-authentication` and `expo-image-picker`.
+  - **Expo Application Services (EAS)**: Created `eas.json` across repository root and `apps/mobile` providing unified build profiles for `development`, `preview` (direct `.apk`), and `production` (Google Play `.aab`).
+  - **Render Web Service Blueprint**: Created `render.yaml` Infrastructure-as-Code blueprint for Render Web Service (Node 22, `/health/ready` check, 0.0.0.0 binding, auto-deploy).
+  - **Vercel Web App Deployment**: Created `vercel.json` with static SPA export configuration, `/index.html` fallback rewrites for deep linking, and CDN cache headers.
+  - **Public Download Interface**: Built `/download` route (`apps/mobile/app/download.tsx`) providing cross-platform access points for Web App launch, Direct Android APK download, and Google Play Store listing.
+  - **Production Readiness Test Suite**: Created automated tests (`apps/server/src/__tests__/production/production-readiness.test.ts`) validating production config validation, CORS origin splitting, health readiness status, and error sanitization (5 tests).
+- [ ] **Task 24 — End-to-End Encryption (E2EE)**: Pre-key bundles, Signal Protocol / Double Ratchet session management, encrypted payload storage, and cryptographic key rotation.
+- [ ] **Task 25 — Production Observability & Telemetry**: Sentry crash reporting integration, Prometheus metrics exporter, structured audit logging, and automated load testing.
 
 ---
 
@@ -193,16 +219,18 @@ The environment system strictly validates 13 distinct categories in `@chatlock/c
 CHATLOCK QUALITY & VERIFICATION MATRIX — 100% PASSING
 ==================================================================================
 TypeScript Monorepo Typecheck:  ✅ 0 errors (all 5 workspace packages)
-Prettier Formatting:            ✅ All files compliant
+Prettier Formatting:            ✅ All files compliant (0 warnings)
 ESLint Strict Linting:          ✅ 0 errors / 0 warnings across all packages
-Server Vitest Test Suite:       ✅ 39 / 39 test files passed (198 / 198 tests)
-Mobile Vitest Test Suite:       ✅ 29 / 29 test files passed (148 / 148 tests)
-Total Automated Tests:          ✅ 68 test files passed (346 / 346 tests)
-Metro Web Bundler:              ✅ 200 OK (5.2 MB bundle)
+Server Vitest Test Suite:       ✅ 41 / 41 test files passed (211 / 211 tests)
+Mobile Vitest Test Suite:       ✅ 31 / 31 test files passed (157 / 157 tests)
+Validation Vitest Test Suite:   ✅ 2 / 2 test files passed (7 / 7 tests)
+Shared-Types / Config:          ✅ Passing
+Total Automated Tests:          ✅ 74 test files passed (375 / 375 tests)
+Expo Web Static Bundler:        ✅ 200 OK (1.6 MB bundle, 0 secrets, SPA fallback)
 Metro Android Bundler (LAN):    ✅ 200 OK (8.7 MB bundle)
 Metro iOS Bundler (LAN):        ✅ 200 OK (7.9 MB bundle)
 Expo Go Manifest (LAN):         ✅ 200 OK (text/plain)
-Backend Express Server:         ✅ 200 OK (/api/v1/health)
+Backend Express Server:         ✅ 200 OK (/api/v1/health & /health/ready)
 MongoDB Atlas Connection:       ✅ Connected & Healthy
 ==================================================================================
 ```

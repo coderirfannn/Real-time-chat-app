@@ -24,7 +24,11 @@ export class MediaController {
       throw new UnauthorizedError('Authentication required');
     }
 
-    const result = await this.service.requestUploadUrl(req.user.id, req.body);
+    const host = req.get('host');
+    const protocol = req.protocol;
+    const clientBaseUrl = host ? `${protocol}://${host}` : undefined;
+
+    const result = await this.service.requestUploadUrl(req.user.id, req.body, clientBaseUrl);
 
     res.status(200).json({
       success: true,
@@ -50,11 +54,41 @@ export class MediaController {
     const expires = Number(req.query['expires']);
     const declaredMime = req.headers['content-type'] || 'application/octet-stream';
 
-    if (!Buffer.isBuffer(req.body) && !(req.body instanceof Uint8Array)) {
+    let buffer: Buffer;
+    const contentType = (req.headers['content-type'] || '').toLowerCase();
+
+    if (Buffer.isBuffer(req.body)) {
+      const textHead = req.body.toString('utf-8', 0, 30).trim();
+      if (
+        textHead.startsWith('{') &&
+        (contentType.includes('json') || textHead.includes('"base64"'))
+      ) {
+        try {
+          const parsed = JSON.parse(req.body.toString('utf-8')) as { base64?: string };
+          if (parsed && typeof parsed.base64 === 'string') {
+            buffer = Buffer.from(parsed.base64, 'base64');
+          } else {
+            buffer = req.body;
+          }
+        } catch {
+          buffer = req.body;
+        }
+      } else {
+        buffer = req.body;
+      }
+    } else if (req.body instanceof Uint8Array) {
+      buffer = Buffer.from(req.body);
+    } else if (typeof req.body === 'string' && req.body.length > 0) {
+      buffer = Buffer.from(req.body, 'base64');
+    } else if (
+      req.body &&
+      typeof req.body === 'object' &&
+      typeof (req.body as Record<string, unknown>)['base64'] === 'string'
+    ) {
+      buffer = Buffer.from((req.body as { base64: string }).base64, 'base64');
+    } else {
       throw new BadRequestError('Upload body must be raw binary data');
     }
-
-    const buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body);
 
     const result = await this.service.processLocalUpload(
       fileKey,
@@ -86,7 +120,8 @@ export class MediaController {
 
     const provider = this.service.getStorageProvider();
     if (!(provider instanceof LocalStorageProvider)) {
-      throw new NotFoundError('Local file serving is only available for local storage driver');
+      res.redirect(provider.getPublicUrl(fileKey));
+      return;
     }
 
     const filePath = provider.getFilePath(fileKey);

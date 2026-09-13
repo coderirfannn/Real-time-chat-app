@@ -45,7 +45,7 @@ export class MessageRepository extends BaseRepository<IMessageDoc> {
       senderId: new Types.ObjectId(data.senderId),
       clientMessageId: data.clientMessageId.trim(),
       type: data.type || 'text',
-      content: data.content.trim(),
+      content: (data.content || '').trim(),
       attachments: data.attachments,
       replyToMessageId: data.replyToMessageId
         ? new Types.ObjectId(data.replyToMessageId)

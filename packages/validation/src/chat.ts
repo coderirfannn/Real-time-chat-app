@@ -46,7 +46,11 @@ export const sendMessageSchema = z
     content: z.string().max(5000, 'Message is too long').default(''),
     type: z.enum(['text', 'image', 'file', 'audio', 'video', 'system']).default('text'),
     attachments: z.array(messageAttachmentSchema).max(10).optional(),
-    replyToMessageId: idSchema.optional(),
+    replyToMessageId: idSchema
+      .or(z.literal(''))
+      .nullable()
+      .optional()
+      .transform((val) => val || undefined),
     tempId: z.string().optional(),
   })
   .refine(

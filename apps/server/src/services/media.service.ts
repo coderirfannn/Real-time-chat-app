@@ -5,6 +5,7 @@ import { config } from '../config/index.js';
 import type { IStorageProvider, SignedUploadDescriptor } from '../storage/storage.interface.js';
 import { LocalStorageProvider } from '../storage/local-storage.provider.js';
 import { S3StorageProvider } from '../storage/s3-storage.provider.js';
+import { CloudinaryStorageProvider } from '../storage/cloudinary-storage.provider.js';
 import {
   conversationRepository,
   type ConversationRepository,
@@ -27,6 +28,24 @@ export class MediaService {
   ) {
     if (storageProvider) {
       this.storageProvider = storageProvider;
+    } else if (config.storage.driver === 'cloudinary') {
+      const cloudName = config.storage.cloudinary?.cloudName?.trim() || '';
+      const apiKey = config.storage.cloudinary?.apiKey?.trim() || '';
+      const apiSecret = config.storage.cloudinary?.apiSecret?.trim() || '';
+
+      if (!cloudName) {
+        mediaLogger.error(
+          'STORAGE_DRIVER is set to "cloudinary", but CLOUDINARY_CLOUD_NAME is not configured in .env! Media cannot be stored on Cloudinary without your Cloud Name.',
+        );
+      }
+
+      this.storageProvider = new CloudinaryStorageProvider(
+        cloudName,
+        apiKey,
+        apiSecret,
+        `http://localhost:${config.app.port}`,
+        config.security.sessionSecret,
+      );
     } else if (config.storage.driver === 's3' && config.storage.s3?.bucket) {
       this.storageProvider = new S3StorageProvider(
         config.storage.s3.bucket,
@@ -57,6 +76,7 @@ export class MediaService {
   public async requestUploadUrl(
     userId: string,
     input: RequestUploadUrlInput,
+    clientBaseUrl?: string,
   ): Promise<UploadUrlResponse> {
     const cleanConvId = input.conversationId.trim();
 
@@ -75,6 +95,7 @@ export class MediaService {
       mimeType: input.mimeType.toLowerCase().trim(),
       size: input.size,
       expiresInSeconds: 900,
+      baseUrl: clientBaseUrl,
     });
 
     const attachment: MessageAttachment = {

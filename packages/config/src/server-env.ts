@@ -60,6 +60,9 @@ export const rawServerEnvSchema = z.object({
   S3_REGION: z.string().optional().default(''),
   S3_ACCESS_KEY: z.string().optional().default(''),
   S3_SECRET_KEY: z.string().optional().default(''),
+  CLOUDINARY_CLOUD_NAME: z.string().optional().default(''),
+  CLOUDINARY_API_KEY: z.string().optional().default(''),
+  CLOUDINARY_API_SECRET: z.string().optional().default(''),
 
   // 8. Push Notifications (Optional when inactive)
   FCM_SERVER_KEY: z.string().optional().default(''),
@@ -161,6 +164,11 @@ export interface ServerConfig {
       region: string;
       accessKey: string;
       secretKey: string;
+    };
+    cloudinary?: {
+      cloudName: string;
+      apiKey: string;
+      apiSecret: string;
     };
   };
   push: {
@@ -273,6 +281,14 @@ export function parseAndValidateServerEnv(
               region: raw.S3_REGION,
               accessKey: raw.S3_ACCESS_KEY || '',
               secretKey: raw.S3_SECRET_KEY || '',
+            }
+          : undefined,
+      cloudinary:
+        raw.CLOUDINARY_CLOUD_NAME || raw.CLOUDINARY_API_KEY || raw.CLOUDINARY_API_SECRET
+          ? {
+              cloudName: raw.CLOUDINARY_CLOUD_NAME || '',
+              apiKey: raw.CLOUDINARY_API_KEY || '',
+              apiSecret: raw.CLOUDINARY_API_SECRET || '',
             }
           : undefined,
     },

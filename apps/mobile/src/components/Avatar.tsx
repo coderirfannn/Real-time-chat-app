@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { avatarPalette } from '../theme/colors';
+import { resolveMediaUrl } from '../utils/media-url';
 
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
@@ -84,14 +85,16 @@ export function Avatar({
             ? styles.dotXl
             : styles.dotMd;
 
+  const resolvedAvatarUrl = useMemo(() => resolveMediaUrl(avatarUrl), [avatarUrl]);
+
   return (
     <View
       style={[styles.wrapper, sizeStyle, hasRing ? styles.ringWrapper : null]}
       accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel || getAvatarAccessibilityLabel(name, isOnline)}
     >
-      {avatarUrl ? (
-        <Image source={{ uri: avatarUrl }} style={[styles.image, sizeStyle]} />
+      {resolvedAvatarUrl ? (
+        <Image source={{ uri: resolvedAvatarUrl }} style={[styles.image, sizeStyle]} />
       ) : (
         <View style={[styles.fallback, sizeStyle, { backgroundColor }]}>
           <Text style={[styles.initials, textSizeStyle]}>{initials}</Text>

@@ -21,10 +21,9 @@ pnpm-debug.log*
 
 # Environment files
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+!.env.test
 
 # IDE and OS
 .DS_Store
@@ -52,3 +51,5 @@ apps/mobile/ios/
 tmp/
 temp/
 scratch/
+uploads/
+**/uploads/

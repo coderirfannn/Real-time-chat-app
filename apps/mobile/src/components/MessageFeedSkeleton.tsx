@@ -4,23 +4,24 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import { View, StyleSheet, Animated, Platform } from 'react-native';
 
 export function MessageFeedSkeleton(): React.JSX.Element {
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
 
   useEffect(() => {
+    const isNative = Platform.OS !== 'web';
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 0.85,
           duration: 850,
-          useNativeDriver: true,
+          useNativeDriver: isNative,
         }),
         Animated.timing(pulseAnim, {
           toValue: 0.4,
           duration: 850,
-          useNativeDriver: true,
+          useNativeDriver: isNative,
         }),
       ]),
     );

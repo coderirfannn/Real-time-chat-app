@@ -22,7 +22,23 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'automatic',
-    plugins: ['expo-router', 'expo-secure-store'],
+    plugins: [
+      'expo-router',
+      'expo-secure-store',
+      [
+        'expo-local-authentication',
+        {
+          faceIDPermission: 'Allow ChatLock to use biometric authentication for app lock.',
+        },
+      ],
+      [
+        'expo-image-picker',
+        {
+          photosPermission: 'Allow ChatLock to access photos to send media attachments.',
+          cameraPermission: 'Allow ChatLock to access camera to take and send photos.',
+        },
+      ],
+    ],
     ios: {
       supportsTablet: false,
       bundleIdentifier: bundleId,
@@ -33,6 +49,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         backgroundColor: '#0F172A',
       },
       package: bundleId,
+      versionCode: 1,
+      permissions: ['android.permission.VIBRATE'],
     },
     web: {
       favicon: './assets/favicon.png',
