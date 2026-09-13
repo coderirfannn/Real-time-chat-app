@@ -18,7 +18,7 @@ export default function DownloadScreen(): React.JSX.Element {
 
   const apkDownloadUrl =
     process.env['EXPO_PUBLIC_APK_DOWNLOAD_URL'] ||
-    'https://github.com/coderirfannn/Real-time-chat-app/releases/latest';
+    'https://expo.dev/artifacts/eas/weuGWZv3VCdNtTnSdxx23QofTuIzVveXSh0995tXrDY.apk';
 
   const playStoreUrl =
     process.env['EXPO_PUBLIC_PLAY_STORE_URL'] ||
