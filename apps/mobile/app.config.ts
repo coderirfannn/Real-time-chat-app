@@ -56,8 +56,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       favicon: './assets/favicon.png',
     },
     extra: {
-      apiUrl: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api/v1',
-      socketUrl: process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:5000',
+      apiUrl:
+        process.env.EXPO_PUBLIC_API_URL ||
+        (isProd ? 'https://chatlock-server.onrender.com/api/v1' : 'http://localhost:5000/api/v1'),
+      socketUrl:
+        process.env.EXPO_PUBLIC_SOCKET_URL ||
+        (isProd ? 'https://chatlock-server.onrender.com' : 'http://localhost:5000'),
       appEnv: env,
       sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN || undefined,
     },
