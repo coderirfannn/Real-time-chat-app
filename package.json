@@ -24,7 +24,9 @@
     "docker:logs": "docker compose -f infrastructure/docker/docker-compose.dev.yml logs -f",
     "clean": "node scripts/clean.js",
     "validate:env": "node scripts/validate-env.js",
-    "prepare": "husky || true"
+    "prepare": "husky || true",
+    "eas-build-post-install": "pnpm --filter \"./packages/*\" run build",
+    "postinstall": "pnpm --filter \"./packages/*\" run build"
   },
   "devDependencies": {
     "@rollup/rollup-win32-x64-msvc": "4.63.1",
