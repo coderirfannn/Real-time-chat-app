@@ -35,13 +35,29 @@ const rawApiUrl =
 const rawSocketUrl =
   expoExtra.socketUrl || process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:5000';
 
-export const mobileConfig: MobileConfig = parseAndValidateMobileEnv({
-  EXPO_PUBLIC_API_URL: resolveDevUrl(rawApiUrl, 'http://localhost:5000/api/v1'),
-  EXPO_PUBLIC_SOCKET_URL: resolveDevUrl(rawSocketUrl, 'http://localhost:5000'),
-  EXPO_PUBLIC_APP_ENV: (expoExtra['appEnv'] ||
-    process.env['EXPO_PUBLIC_APP_ENV'] ||
-    'development') as 'development' | 'test' | 'staging' | 'production',
-  EXPO_PUBLIC_SENTRY_DSN: expoExtra['sentryDsn'] || process.env['EXPO_PUBLIC_SENTRY_DSN'],
-});
+let parsedConfig: MobileConfig;
+try {
+  parsedConfig = parseAndValidateMobileEnv({
+    EXPO_PUBLIC_API_URL: resolveDevUrl(rawApiUrl, 'http://localhost:5000/api/v1'),
+    EXPO_PUBLIC_SOCKET_URL: resolveDevUrl(rawSocketUrl, 'http://localhost:5000'),
+    EXPO_PUBLIC_APP_ENV: (expoExtra['appEnv'] ||
+      process.env['EXPO_PUBLIC_APP_ENV'] ||
+      'development') as 'development' | 'test' | 'staging' | 'production',
+    EXPO_PUBLIC_SENTRY_DSN: expoExtra['sentryDsn'] || process.env['EXPO_PUBLIC_SENTRY_DSN'],
+  });
+} catch (err) {
+  // eslint-disable-next-line no-console
+  console.warn('[mobileConfig] Fallback configuration applied:', err);
+  parsedConfig = {
+    apiUrl: 'https://chatlock-server.onrender.com/api/v1',
+    socketUrl: 'https://chatlock-server.onrender.com',
+    env: 'production',
+    isDevelopment: false,
+    isProduction: true,
+    isStaging: false,
+  };
+}
+
+export const mobileConfig: MobileConfig = parsedConfig;
 
 export default mobileConfig;

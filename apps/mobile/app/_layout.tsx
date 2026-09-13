@@ -61,6 +61,8 @@ function AuthLifecycleManager({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
 
+    if (segments[0] === 'download') return;
+
     const inAuthGroup = segments[0] === '(auth)';
 
     if (!isAuthenticated && !inAuthGroup) {
@@ -79,28 +81,30 @@ function AuthLifecycleManager({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthenticated, accessToken]);
 
-  if (isLoading) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: '#181A20',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        <ActivityIndicator size="large" color="#246BFD" />
-      </View>
-    );
-  }
-
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: '#181A20' }}>
       {children}
+      {isLoading && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: '#181A20',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <ActivityIndicator size="large" color="#246BFD" />
+        </View>
+      )}
       {isAuthenticated && isLocked && (
         <AppLockModal isVisible={isLocked} onUnlocked={() => setIsLocked(false)} />
       )}
-    </>
+    </View>
   );
 }
 
@@ -116,8 +120,10 @@ export default function RootLayout() {
               contentStyle: { backgroundColor: '#181A20' },
             }}
           >
+            <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="(main)" options={{ headerShown: false }} />
+            <Stack.Screen name="download" options={{ headerShown: false }} />
           </Stack>
         </AuthLifecycleManager>
       </QueryClientProvider>
