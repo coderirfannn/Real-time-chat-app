@@ -58,6 +58,32 @@ export class DeviceRepository extends BaseRepository<IDeviceDoc> {
       { isActive: false },
     );
   }
+
+  public async findActivePushTokensByUsers(
+    userIds: (string | Types.ObjectId)[],
+  ): Promise<string[]> {
+    if (!userIds || userIds.length === 0) return [];
+    const objectIds = userIds
+      .filter((id) => Types.ObjectId.isValid(String(id)))
+      .map((id) => new Types.ObjectId(id));
+    if (objectIds.length === 0) return [];
+
+    const devices = await this.model
+      .find({
+        userId: { $in: objectIds },
+        isActive: true,
+        pushToken: { $exists: true, $ne: '' },
+      })
+      .select('pushToken')
+      .lean()
+      .exec();
+
+    const tokens = devices
+      .map((d) => d.pushToken)
+      .filter((t): t is string => Boolean(t && t.trim().length > 0));
+
+    return Array.from(new Set(tokens));
+  }
 }
 
 export const deviceRepository = new DeviceRepository();

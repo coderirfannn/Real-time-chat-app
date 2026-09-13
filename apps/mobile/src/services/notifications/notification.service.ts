@@ -1,5 +1,8 @@
 import { Platform, Vibration } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { useNotificationStore } from '../../store/notification.store';
+import { apiClient } from '../api/client';
 
 export interface IncomingMessageNotificationPayload {
   conversationId: string;
@@ -29,9 +32,27 @@ interface WebAudioContext {
   destination: unknown;
 }
 
+// Configure foreground notification behavior on native platforms
+if (Platform.OS !== 'web') {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  } catch {
+    // Safe initialization fallback
+  }
+}
+
 export class NotificationService {
   private static instance: NotificationService | null = null;
   private isInitialized = false;
+  private pushToken: string | null = null;
 
   private constructor() {}
 
@@ -50,13 +71,94 @@ export class NotificationService {
     return this.isInitialized;
   }
 
+  public getPushToken(): string | null {
+    return this.pushToken;
+  }
+
+  /**
+   * Initializes notification channels, permissions, and push token registration.
+   */
   public async initialize(): Promise<void> {
+    if (this.isInitialized) return;
     this.isInitialized = true;
+
+    if (Platform.OS === 'web') return;
+
+    try {
+      // 1. Android Notification Channel (Required for heads-up alerts on Android 8.0+)
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('chat_messages', {
+          name: 'Chat Messages',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#2563EB',
+          sound: 'default',
+          enableVibrate: true,
+          showBadge: true,
+        });
+      }
+
+      // 2. Request permissions and register push token with backend
+      await this.registerForPushNotifications();
+    } catch (err) {
+      console.warn('[NotificationService] Initialization warning:', err);
+    }
+  }
+
+  /**
+   * Requests push notification permissions and registers the Expo push token with the server.
+   */
+  public async registerForPushNotifications(): Promise<string | null> {
+    if (Platform.OS === 'web') return null;
+
+    try {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== 'granted') {
+        return null;
+      }
+
+      const projectId =
+        Constants.expoConfig?.extra?.eas?.projectId ??
+        Constants.easConfig?.projectId ??
+        'd0d37a73-72a4-4fcb-902a-e3ded337236f';
+
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId,
+      });
+
+      const token = tokenData?.data || null;
+      this.pushToken = token;
+
+      if (token) {
+        // Register token with backend server
+        try {
+          await apiClient.post('/devices/push-token', {
+            pushToken: token,
+            platform: Platform.OS,
+            deviceId: Constants.sessionId || `device_${Platform.OS}`,
+            appVersion: Constants.expoConfig?.version || '0.1.0',
+          });
+        } catch {
+          // Safe non-blocking sync if offline
+        }
+      }
+
+      return token;
+    } catch (err) {
+      console.warn('[NotificationService] Failed to register push token:', err);
+      return null;
+    }
   }
 
   /**
    * Triggers device vibration according to device capabilities and settings.
-   * Uses React Native core Vibration API for seamless cross-platform reliability on iOS and Android.
    */
   public async triggerVibration(): Promise<void> {
     const { vibrateEnabled } = useNotificationStore.getState();
@@ -135,8 +237,7 @@ export class NotificationService {
   }
 
   /**
-   * Main notification handler when an incoming message is received.
-   * Automatically vibrates and rings according to device hardware and settings.
+   * Main notification handler when an incoming message is received while app is active.
    */
   public async notifyIncomingMessage(payload: IncomingMessageNotificationPayload): Promise<void> {
     const {
@@ -160,22 +261,42 @@ export class NotificationService {
       this.playBellSound();
     }
 
-    // 3. Desktop / Browser Notification if available and outside active chat
+    // 3. Native In-App Banner / Local Notification
     if (inAppAlertsEnabled && activeConversationId !== payload.conversationId) {
-      try {
-        const globalScope =
-          typeof globalThis !== 'undefined' ? (globalThis as Record<string, unknown>) : {};
-        const NotificationClass = globalScope['Notification'] as
-          | { permission: string; new (title: string, opts?: Record<string, unknown>): unknown }
-          | undefined;
-
-        if (NotificationClass && NotificationClass.permission === 'granted') {
-          new NotificationClass(payload.senderName || 'New message', {
-            body: payload.content || 'Sent a message',
+      if (Platform.OS !== 'web') {
+        try {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: payload.senderName || 'ChatLock',
+              body: payload.content || 'Sent a message',
+              sound: soundEnabled ? 'default' : undefined,
+              data: {
+                conversationId: payload.conversationId,
+                senderId: payload.senderId,
+              },
+            },
+            trigger: null,
           });
+        } catch {
+          // Ignore local notification errors
         }
-      } catch {
-        // Ignore desktop notification errors
+      } else {
+        // Desktop / Browser Notification
+        try {
+          const globalScope =
+            typeof globalThis !== 'undefined' ? (globalThis as Record<string, unknown>) : {};
+          const NotificationClass = globalScope['Notification'] as
+            | { permission: string; new (title: string, opts?: Record<string, unknown>): unknown }
+            | undefined;
+
+          if (NotificationClass && NotificationClass.permission === 'granted') {
+            new NotificationClass(payload.senderName || 'New message', {
+              body: payload.content || 'Sent a message',
+            });
+          }
+        } catch {
+          // Ignore desktop notification errors
+        }
       }
     }
   }

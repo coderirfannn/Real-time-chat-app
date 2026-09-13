@@ -54,30 +54,40 @@ export class MessageService {
       throw new ForbiddenError('You are not authorized to send messages in this conversation');
     }
 
-    // 3. Fetch participants for recipient notifications and receipt tracking
+    // 3. Fetch participants and check idempotency in parallel
+    const [existingMessage, conv] = await Promise.all([
+      this.messageRepo.findByClientMessageId(cleanSenderId, clientMessageId),
+      typeof this.conversationRepo.findById === 'function'
+        ? Promise.resolve(this.conversationRepo.findById(cleanConvId)).catch(() => null)
+        : Promise.resolve(null),
+    ]);
+
+    // 3. Extract participant IDs for recipient notifications and receipt tracking
     let participantIds: string[] = [cleanSenderId];
-    try {
-      if (typeof this.conversationRepo.findById === 'function') {
-        const conv = await this.conversationRepo.findById(cleanConvId);
-        if (conv && Array.isArray(conv.participants) && conv.participants.length > 0) {
-          participantIds = conv.participants.map(
+    if (conv && Array.isArray(conv.participants) && conv.participants.length > 0) {
+      participantIds = conv.participants.map(
+        (p: unknown) =>
+          (p as { _id?: Types.ObjectId; id?: string })?._id?.toString() ||
+          (p as { id?: string })?.id ||
+          (p as Types.ObjectId).toString(),
+      );
+    } else if (typeof this.conversationRepo.findById === 'function') {
+      try {
+        const fetchedConv = await this.conversationRepo.findById(cleanConvId);
+        if (fetchedConv && Array.isArray(fetchedConv.participants) && fetchedConv.participants.length > 0) {
+          participantIds = fetchedConv.participants.map(
             (p: unknown) =>
               (p as { _id?: Types.ObjectId; id?: string })?._id?.toString() ||
               (p as { id?: string })?.id ||
               (p as Types.ObjectId).toString(),
           );
         }
+      } catch {
+        participantIds = [cleanSenderId];
       }
-    } catch {
-      participantIds = [cleanSenderId];
     }
 
     // 4. Idempotency check: prevent duplicate insertion
-    const existingMessage = await this.messageRepo.findByClientMessageId(
-      cleanSenderId,
-      clientMessageId,
-    );
-
     if (existingMessage) {
       messageLogger.info(
         'Duplicate message detected via clientMessageId; reusing existing record',
@@ -107,35 +117,35 @@ export class MessageService {
       replyToMessageId: payload.replyToMessageId,
     });
 
-    // 6. Update conversation last message timestamp & reference
-    await this.conversationRepo.updateLastMessage(
-      cleanConvId,
-      messageDoc._id.toString(),
-      messageDoc.createdAt,
-    );
-
-    // 7. Initialize 'sent' receipts for all recipients so unread counts and status are tracked
+    // 6. Update conversation last message & initialize receipts concurrently
     const recipientIds = participantIds.filter((id) => id !== cleanSenderId);
+    const postSendTasks: Promise<unknown>[] = [
+      this.conversationRepo.updateLastMessage(
+        cleanConvId,
+        messageDoc._id.toString(),
+        messageDoc.createdAt,
+      ),
+    ];
+
     if (
       this.receiptRepo &&
       typeof this.receiptRepo.upsertReceipt === 'function' &&
       recipientIds.length > 0
     ) {
-      try {
-        await Promise.all(
-          recipientIds.map((recipientId) =>
-            this.receiptRepo.upsertReceipt({
-              messageId: messageDoc._id.toString(),
-              conversationId: cleanConvId,
-              userId: recipientId,
-              status: 'sent',
-            }),
-          ),
+      for (const recipientId of recipientIds) {
+        postSendTasks.push(
+          this.receiptRepo.upsertReceipt({
+            messageId: messageDoc._id.toString(),
+            conversationId: cleanConvId,
+            userId: recipientId,
+            status: 'sent',
+          }),
         );
-      } catch {
-        // Safe fallback in mock test environments
       }
     }
+
+    // Await post-send metadata tasks in parallel
+    await Promise.all(postSendTasks).catch(() => {});
 
     messageLogger.debug('Message created, receipts initialized, and conversation updated', {
       messageId: messageDoc._id.toString(),

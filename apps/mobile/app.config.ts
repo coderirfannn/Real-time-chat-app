@@ -39,6 +39,13 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           cameraPermission: 'Allow ChatLock to access camera to take and send photos.',
         },
       ],
+      [
+        'expo-notifications',
+        {
+          icon: './assets/icon.png',
+          color: '#2563EB',
+        },
+      ],
     ],
     ios: {
       supportsTablet: false,
@@ -51,7 +58,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       },
       package: bundleId,
       versionCode: 1,
-      permissions: ['android.permission.VIBRATE'],
+      permissions: ['android.permission.VIBRATE', 'android.permission.POST_NOTIFICATIONS'],
     },
     web: {
       favicon: './assets/favicon.png',

@@ -11,6 +11,8 @@ import { messageService, type MessageService } from '../../services/message.serv
 import { roomManager } from '../rooms.js';
 import type { AuthenticatedSocket } from '../middleware/auth.socket.middleware.js';
 import type { TypedSocketServer } from '../index.js';
+import { deviceRepository } from '../../repositories/device.repository.js';
+import { pushNotificationService } from '../../services/push-notification.service.js';
 import { AppError } from '../../errors/app-error.js';
 import { ErrorCode } from '../../errors/error-codes.js';
 import { logger } from '../../utils/logger.js';
@@ -89,6 +91,38 @@ export function registerMessageEvents(
           senderId,
           clientMessageId: validPayload.clientMessageId,
         });
+
+        // Non-blocking background push notification dispatch to offline/background recipient devices
+        const recipientIds = (result.participantIds || []).filter((pid) => pid !== senderId);
+        if (recipientIds.length > 0) {
+          const senderDisplayName = socket.data.user.username || 'ChatLock';
+          const notificationBody =
+            validPayload.content?.trim() ||
+            (validPayload.attachments && validPayload.attachments.length > 0
+              ? 'Sent an attachment'
+              : 'Sent a message');
+
+          deviceRepository
+            .findActivePushTokensByUsers(recipientIds)
+            .then((tokens) => {
+              if (tokens && tokens.length > 0) {
+                return pushNotificationService.sendPushNotifications(tokens, {
+                  title: senderDisplayName,
+                  body: notificationBody,
+                  channelId: 'chat_messages',
+                  data: {
+                    conversationId: validPayload.conversationId,
+                    messageId: result.message.id,
+                    senderId,
+                  },
+                });
+              }
+              return null;
+            })
+            .catch((err) => {
+              socketMsgLogger.warn('Background push notification error', { error: err });
+            });
+        }
       }
 
       // 6. Acknowledge sender

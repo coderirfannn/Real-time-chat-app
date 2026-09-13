@@ -9,7 +9,7 @@ import { useAppStore } from '../../../store/app.store';
 import { useAuthStore } from '../../../store/auth.store';
 import { useNotificationStore } from '../../../store/notification.store';
 import { buildInvertedChatFeed } from '../../../utils/message-grouper';
-import { reconcileChatMessages } from '../../../utils/message-reconciler';
+import { reconcileChatMessages, resolveHighestStatus } from '../../../utils/message-reconciler';
 import { CONVERSATIONS_QUERY_KEY } from './useConversations';
 import type { LocalMessage, OutboxMessage, ChatFeedItem } from '../../../types/chat.types';
 import type {
@@ -357,6 +357,20 @@ export function useChat(conversationId: string): UseChatReturn {
     const unsubSent = socketManager.onMessageSent((ack: MessageAckResponse) => {
       if (!ack.clientMessageId) return;
 
+      // Immediately upgrade optimistic message status in feed upon server ACK
+      setSocketMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.clientMessageId === ack.clientMessageId) {
+            return {
+              ...msg,
+              id: ack.serverMessageId || msg.id,
+              status: resolveHighestStatus(msg.status, ack.success ? 'sent' : 'failed'),
+            };
+          }
+          return msg;
+        }),
+      );
+
       // Dequeue from outbox service upon server ACK
       outboxService.dequeue(ack.clientMessageId).catch(() => {});
     });
@@ -479,22 +493,76 @@ export function useChat(conversationId: string): UseChatReturn {
         },
       };
 
+      const nowIso = new Date().toISOString();
+      const optimisticMsg: LocalMessage = {
+        id: clientMessageId,
+        clientMessageId,
+        conversationId,
+        senderId: currentUserId,
+        sender: currentUser ?? undefined,
+        content: content.trim(),
+        type: msgType,
+        attachments: hasAttachments ? attachments : undefined,
+        replyToMessageId: targetReplyId,
+        status: isConnected ? 'sending' : 'pending',
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+
+      // 1. INSTANT OPTIMISTIC FEED INJECTION (0ms latency - appears immediately in chat feed!)
+      setSocketMessages((prev) => {
+        const exists = prev.some((m) => m.clientMessageId === clientMessageId);
+        if (exists) return prev;
+        return [...prev, optimisticMsg];
+      });
+
+      // 2. Immediately update conversation snippet in conversations list cache
+      queryClient.setQueryData(CONVERSATIONS_QUERY_KEY, (oldData: unknown) => {
+        if (!oldData) return oldData;
+        const list = Array.isArray(oldData)
+          ? oldData
+          : (oldData as { docs?: Record<string, unknown>[] }).docs || [];
+
+        const updated = list.map((c) => {
+          const cId = c['id'] || c['_id'];
+          if (cId === conversationId) {
+            return {
+              ...c,
+              lastMessage: optimisticMsg,
+              lastMessageId: optimisticMsg,
+              lastMessageAt: nowIso,
+              unreadCount: 0,
+            };
+          }
+          return c;
+        });
+
+        return Array.isArray(oldData) ? updated : { ...(oldData as object), docs: updated };
+      });
+
       setReplyingTo(null);
 
-      // 1. Save to durable persistent storage immediately
-      await outboxService.enqueue(outboxItem);
-
-      // 2. If online and socket connected, attempt immediate delivery
-      if (isConnected) {
-        setIsSending(true);
-        try {
-          await outboxSyncManager.sendMessageWithBackoff(outboxItem);
-        } finally {
-          setIsSending(false);
-        }
-      }
+      // 3. Persist to outbox queue and dispatch over WebSocket in background without blocking UI
+      outboxService
+        .enqueue(outboxItem)
+        .then(() => {
+          if (isConnected) {
+            setIsSending(true);
+            outboxSyncManager
+              .sendMessageWithBackoff(outboxItem)
+              .finally(() => setIsSending(false));
+          }
+        })
+        .catch(() => {
+          if (isConnected) {
+            setIsSending(true);
+            outboxSyncManager
+              .sendMessageWithBackoff(outboxItem)
+              .finally(() => setIsSending(false));
+          }
+        });
     },
-    [conversationId, currentUser, currentUserId, isNetworkOnline, replyingTo],
+    [conversationId, currentUser, currentUserId, isNetworkOnline, replyingTo, queryClient],
   );
 
   const startTyping = useCallback(() => {
