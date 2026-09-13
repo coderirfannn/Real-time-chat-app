@@ -56,6 +56,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       favicon: './assets/favicon.png',
     },
     extra: {
+      eas: {
+        projectId: 'd0d37a73-72a4-4fcb-902a-e3ded337236f',
+      },
       apiUrl:
         process.env.EXPO_PUBLIC_API_URL ||
         (isProd ? 'https://chatlock-server.onrender.com/api/v1' : 'http://localhost:5000/api/v1'),

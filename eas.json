@@ -1,7 +1,6 @@
 {
   "cli": {
-    "version": ">= 15.0.0",
-    "appDir": "apps/mobile"
+    "version": ">= 15.0.0"
   },
   "build": {
     "development": {
