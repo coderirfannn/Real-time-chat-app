@@ -233,6 +233,7 @@ Expo Go Manifest (LAN):         ✅ 200 OK (text/plain)
 Backend Express Server:         ✅ 200 OK (/api/v1/health & /health/ready)
 Production Render Backend:      ✅ 200 OK (https://chatlock-server.onrender.com)
 Production Vercel Web App:      ✅ 200 OK (https://chatlock-web.vercel.app)
+EAS Android APK Build (Preview): ✅ In Progress (ID: 686b0967-f63f-4b31-b9f2-8daab3679600)
 MongoDB Atlas Connection:       ✅ Connected & Healthy (cluster: secureapp)
 ==================================================================================
 ```
