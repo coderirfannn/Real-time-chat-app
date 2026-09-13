@@ -423,8 +423,8 @@ export class SocketService {
       }
     });
 
-    socket.on(SocketEvents.ERROR, (error) => {
-      console.warn('[ChatLock:Socket] Gateway error:', error.code, error.message);
+    socket.on(SocketEvents.ERROR, (error: { code?: string; message?: string }) => {
+      console.warn('[ChatLock:Socket] Gateway error:', error?.code, error?.message);
     });
   }
 }
