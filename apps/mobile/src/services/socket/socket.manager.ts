@@ -249,9 +249,7 @@ export class SocketManager {
   /**
    * Registers callback for real-time reaction events.
    */
-  public onMessageReaction(
-    listener: (payload: MessageReactionEventPayload) => void,
-  ): () => void {
+  public onMessageReaction(listener: (payload: MessageReactionEventPayload) => void): () => void {
     return socketService.onMessageReaction(listener);
   }
 

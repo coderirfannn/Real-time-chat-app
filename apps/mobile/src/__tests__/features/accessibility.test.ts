@@ -14,7 +14,13 @@ function srgbToLinear(c: number): number {
 
 function hexToRgb(hex: string): [number, number, number] {
   const clean = hex.replace('#', '');
-  const expanded = clean.length === 3 ? clean.split('').map((x) => x + x).join('') : clean;
+  const expanded =
+    clean.length === 3
+      ? clean
+          .split('')
+          .map((x) => x + x)
+          .join('')
+      : clean;
   const num = parseInt(expanded, 16);
   return [num >> 16, (num >> 8) & 255, num & 255];
 }
@@ -89,4 +95,3 @@ describe('Accessibility & WCAG 2.1 AA Contrast Audit — Phase 10 Verification',
     expect(btn.props.accessibilityLabel).toBe('Submit registration form');
   });
 });
-

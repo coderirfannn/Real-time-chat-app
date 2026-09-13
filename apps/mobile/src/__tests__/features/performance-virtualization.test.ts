@@ -9,8 +9,9 @@ describe('Performance, Virtualization & Re-render Verification — Phase 11', ()
   it('1. CONVERSATION ITEM MEMOIZATION: wrapped with React.memo to prevent unnecessary re-renders', () => {
     // In React, memoized components have a $$typeof symbol indicating memo
     const isMemo =
-      (ConversationItem as unknown as { $$typeof?: symbol }).$$typeof?.toString().includes('memo') ||
-      typeof ConversationItem === 'object';
+      (ConversationItem as unknown as { $$typeof?: symbol }).$$typeof
+        ?.toString()
+        .includes('memo') || typeof ConversationItem === 'object';
     expect(isMemo).toBe(true);
   });
 

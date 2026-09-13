@@ -59,8 +59,7 @@ export function ConversationListPane({
   const keyExtractor = useCallback((item: ConversationItemData) => item.id, []);
 
   // Safe area top padding — only apply on mobile native, not desktop
-  const topInset =
-    Platform.OS !== 'web' ? Math.max(insets.top, 8) : 0;
+  const topInset = Platform.OS !== 'web' ? Math.max(insets.top, 8) : 0;
 
   return (
     <View style={styles.container}>

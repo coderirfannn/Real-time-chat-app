@@ -13,24 +13,24 @@ config.resolver.nodeModulesPaths = [
 ];
 
 // 2. In monorepos, watch monorepo root and all workspace packages
-config.watchFolders = [
-  ...new Set([
-    ...(config.watchFolders || []),
-    monorepoRoot,
-  ]),
-];
+config.watchFolders = [...new Set([...(config.watchFolders || []), monorepoRoot])];
 
 // 3. Map any peer dependencies across pnpm symlinks to the canonical installed package
-config.resolver.extraNodeModules = new Proxy({}, {
-  get: (target, name) => {
-    if (typeof name !== 'string') return target[name];
-    try {
-      const pkgJson = require.resolve(name + '/package.json', { paths: [projectRoot, monorepoRoot] });
-      return path.dirname(pkgJson);
-    } catch {
-      return path.resolve(projectRoot, 'node_modules', name);
-    }
+config.resolver.extraNodeModules = new Proxy(
+  {},
+  {
+    get: (target, name) => {
+      if (typeof name !== 'string') return target[name];
+      try {
+        const pkgJson = require.resolve(name + '/package.json', {
+          paths: [projectRoot, monorepoRoot],
+        });
+        return path.dirname(pkgJson);
+      } catch {
+        return path.resolve(projectRoot, 'node_modules', name);
+      }
+    },
   },
-});
+);
 
 module.exports = config;

@@ -78,4 +78,3 @@ describe('UI Primitives & Adapted Components — Task Phase 1 Verification', () 
     expect((card.props as { padding?: string }).padding).toBe('lg');
   });
 });
-

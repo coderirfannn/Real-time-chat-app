@@ -191,4 +191,3 @@ describe('Mobile Receipts & Monotonic Reconciliation Tests — Task 13 Verificat
     expect(unreadCount).toBe(1);
   });
 });
-

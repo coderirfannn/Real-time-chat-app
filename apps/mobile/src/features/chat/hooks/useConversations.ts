@@ -254,7 +254,9 @@ export function useConversations() {
             (rawSender as unknown as { id?: string; _id?: string })?._id ||
             (rawSender ? String(rawSender) : '');
 
-      const isLastSenderMe = Boolean(currentUserId && lastSenderId && lastSenderId === currentUserId);
+      const isLastSenderMe = Boolean(
+        currentUserId && lastSenderId && lastSenderId === currentUserId,
+      );
 
       return {
         id: convId,
@@ -267,7 +269,7 @@ export function useConversations() {
             }
           : undefined,
         lastMessageAt: conv.lastMessageAt || conv.updatedAt,
-        unreadCount: activeConvId === convId || isLastSenderMe ? 0 : (conv.unreadCount || 0),
+        unreadCount: activeConvId === convId || isLastSenderMe ? 0 : conv.unreadCount || 0,
         isOnline: recipient.status === 'online',
       };
     });

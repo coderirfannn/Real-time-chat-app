@@ -118,7 +118,6 @@ export const MessageList = memo(
       );
     }, [isLoadingMore]);
 
-
     if (items.length === 0) {
       return (
         <View style={styles.emptyContainer}>
@@ -127,7 +126,8 @@ export const MessageList = memo(
             <Text style={styles.lockTitle}>End-to-End Encrypted</Text>
           </View>
           <Text style={styles.emptySubtitle}>
-            Messages and calls with {recipientName} are secured with end-to-end encryption. No one outside of this chat can read them.
+            Messages and calls with {recipientName} are secured with end-to-end encryption. No one
+            outside of this chat can read them.
           </Text>
 
           <View style={styles.icebreakerRow}>

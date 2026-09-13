@@ -32,7 +32,11 @@ export interface UseChatReturn {
   isRefreshing: boolean;
   isPeerTyping: boolean;
   error: Error | null;
-  sendMessage: (content: string, attachments?: MessageAttachment[], replyToMessageId?: string) => Promise<void>;
+  sendMessage: (
+    content: string,
+    attachments?: MessageAttachment[],
+    replyToMessageId?: string,
+  ) => Promise<void>;
   retryMessage: (clientMessageId: string) => Promise<void>;
   startTyping: () => void;
   stopTyping: () => void;

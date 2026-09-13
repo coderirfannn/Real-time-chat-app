@@ -28,18 +28,7 @@ export interface InputProps extends TextInputProps {
 }
 
 export const Input = forwardRef<TextInput, InputProps>(function Input(
-  {
-    label,
-    error,
-    hint,
-    iconLeft,
-    iconRight,
-    containerStyle,
-    inputStyle,
-    onFocus,
-    onBlur,
-    ...rest
-  },
+  { label, error, hint, iconLeft, iconRight, containerStyle, inputStyle, onFocus, onBlur, ...rest },
   ref,
 ): React.JSX.Element {
   const [isFocused, setIsFocused] = useState(false);

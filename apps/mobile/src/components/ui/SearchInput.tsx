@@ -39,13 +39,7 @@ export function SearchInput({
   };
 
   return (
-    <View
-      style={[
-        styles.container,
-        isFocused && styles.containerFocused,
-        containerStyle,
-      ]}
-    >
+    <View style={[styles.container, isFocused && styles.containerFocused, containerStyle]}>
       <Icon name="search" size={16} color="#757B8C" style={styles.searchIcon} />
 
       <TextInput

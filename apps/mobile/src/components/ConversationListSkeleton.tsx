@@ -10,7 +10,9 @@ export interface ConversationListSkeletonProps {
   count?: number;
 }
 
-export function ConversationListSkeleton({ count = 7 }: ConversationListSkeletonProps): React.JSX.Element {
+export function ConversationListSkeleton({
+  count = 7,
+}: ConversationListSkeletonProps): React.JSX.Element {
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
 
   useEffect(() => {
@@ -45,10 +47,7 @@ export function ConversationListSkeleton({ count = 7 }: ConversationListSkeleton
             <View style={styles.topRow}>
               {/* Name Bar */}
               <Animated.View
-                style={[
-                  styles.nameBar,
-                  { width: index % 2 === 0 ? 130 : 160, opacity: pulseAnim },
-                ]}
+                style={[styles.nameBar, { width: index % 2 === 0 ? 130 : 160, opacity: pulseAnim }]}
               />
               {/* Timestamp Bar */}
               <Animated.View style={[styles.timeBar, { opacity: pulseAnim }]} />

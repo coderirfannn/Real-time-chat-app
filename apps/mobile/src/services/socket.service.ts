@@ -365,9 +365,7 @@ export class SocketService {
   /**
    * Registers callback for message:reaction events.
    */
-  public onMessageReaction(
-    listener: (payload: MessageReactionEventPayload) => void,
-  ): () => void {
+  public onMessageReaction(listener: (payload: MessageReactionEventPayload) => void): () => void {
     const socket = this.getSocket();
     socket.on(SocketEvents.MESSAGE_REACTION, listener as never);
     return () => {
@@ -415,7 +413,10 @@ export class SocketService {
             socket.connect();
           }
         } catch (refreshErr) {
-          console.error('[ChatLock:Socket] Automatic token refresh failed on reconnect:', refreshErr);
+          console.error(
+            '[ChatLock:Socket] Automatic token refresh failed on reconnect:',
+            refreshErr,
+          );
         } finally {
           this.isRefreshingToken = false;
         }

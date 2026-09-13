@@ -57,4 +57,3 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
 export type LogoutInput = z.infer<typeof logoutSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
-

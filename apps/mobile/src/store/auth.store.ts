@@ -33,9 +33,7 @@ function isTokenExpired(token: string): boolean {
       base64 += '=';
     }
     const jsonPayload =
-      typeof atob === 'function'
-        ? atob(base64)
-        : Buffer.from(base64, 'base64').toString('binary');
+      typeof atob === 'function' ? atob(base64) : Buffer.from(base64, 'base64').toString('binary');
     const payload = JSON.parse(jsonPayload);
     if (typeof payload.exp === 'number') {
       // Buffer of 10 seconds before expiration

@@ -48,9 +48,7 @@ export function ConnectionBanner(): React.JSX.Element | null {
     return (
       <View style={[styles.banner, styles.reconnecting]}>
         <View style={[styles.pulseDot, styles.reconnectingDot]} />
-        <Text style={[styles.text, styles.reconnectingText]}>
-          Reconnecting…
-        </Text>
+        <Text style={[styles.text, styles.reconnectingText]}>Reconnecting…</Text>
       </View>
     );
   }
@@ -59,9 +57,7 @@ export function ConnectionBanner(): React.JSX.Element | null {
     return (
       <View style={[styles.banner, styles.error]}>
         <Icon name="alert-circle" size={14} color="#F75555" />
-        <Text style={[styles.text, styles.errorText]}>
-          Connection lost. Retrying securely…
-        </Text>
+        <Text style={[styles.text, styles.errorText]}>Connection lost. Retrying securely…</Text>
       </View>
     );
   }

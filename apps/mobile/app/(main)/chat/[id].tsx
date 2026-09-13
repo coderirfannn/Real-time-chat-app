@@ -165,8 +165,6 @@ export default function ChatScreen(): React.JSX.Element {
     [sendMessage],
   );
 
-
-
   const displayName = recipient.displayName || recipient.username || 'Direct Message';
   const isOnline = recipient.status === 'online';
 
@@ -253,7 +251,9 @@ export default function ChatScreen(): React.JSX.Element {
       {/* Main Virtualized Message Feed */}
       <KeyboardAvoidingView
         style={styles.chatArea}
-        behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
+        behavior={
+          Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined
+        }
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 48 : 0}
       >
         {isLoading && feedItems.length === 0 ? (
@@ -364,7 +364,8 @@ export default function ChatScreen(): React.JSX.Element {
               <View style={styles.encryptionDetails}>
                 <Text style={styles.encryptionTitle}>End-to-End Encrypted</Text>
                 <Text style={styles.encryptionSub}>
-                  Messages and calls are secured with end-to-end encryption. No third party can read them.
+                  Messages and calls are secured with end-to-end encryption. No third party can read
+                  them.
                 </Text>
               </View>
             </View>
@@ -420,9 +421,7 @@ export default function ChatScreen(): React.JSX.Element {
               }}
             />
           </View>
-          <View style={styles.desktopChatContainer}>
-            {renderChatContent()}
-          </View>
+          <View style={styles.desktopChatContainer}>{renderChatContent()}</View>
         </View>
       </View>
     );

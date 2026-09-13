@@ -107,10 +107,7 @@ export default function ConversationListScreen(): React.JSX.Element {
           conversation?: { id?: string; _id?: string };
         };
         const convId =
-          resObj.conversation?.id ||
-          resObj.conversation?._id ||
-          resObj.id ||
-          resObj._id;
+          resObj.conversation?.id || resObj.conversation?._id || resObj.id || resObj._id;
         handleCloseNewChatModal();
         if (convId) {
           router.push(`/(main)/chat/${convId}` as never);
@@ -189,7 +186,12 @@ export default function ConversationListScreen(): React.JSX.Element {
 
           {searchError && (
             <View style={styles.modalError}>
-              <Icon name="alert-circle" size={16} color={semanticColors.error} style={styles.modalErrorIcon} />
+              <Icon
+                name="alert-circle"
+                size={16}
+                color={semanticColors.error}
+                style={styles.modalErrorIcon}
+              />
               <Text style={styles.modalErrorText}>{searchError}</Text>
             </View>
           )}

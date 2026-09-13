@@ -65,7 +65,6 @@ describe('Design System Theme & Tokens — Task Phase 1 Verification', () => {
     expect(shadows.md).toBeDefined();
   });
 
-
   it('6. THEME HELPER: getTheme returns complete themed structure for dark and light', () => {
     const darkTheme = getTheme('dark');
     expect(darkTheme.isDark).toBe(true);

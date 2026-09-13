@@ -3,6 +3,8 @@ import { Types } from 'mongoose';
 import { MessageService } from '../../services/message.service.js';
 import type { MessageRepository } from '../../repositories/message.repository.js';
 import type { ConversationRepository } from '../../repositories/conversation.repository.js';
+import type { MessageReceiptRepository } from '../../repositories/message-receipt.repository.js';
+import type { IConversationDoc } from '../../models/conversation.model.js';
 import type { IMessageDoc } from '../../models/message.model.js';
 import { BadRequestError, ForbiddenError } from '../../errors/app-error.js';
 
@@ -55,7 +57,7 @@ describe('MessageService Unit Tests', () => {
     service = new MessageService(
       mockMessageRepo as MessageRepository,
       mockConvRepo as ConversationRepository,
-      mockReceiptRepo as unknown as any,
+      mockReceiptRepo as unknown as MessageReceiptRepository,
     );
   });
 
@@ -131,7 +133,7 @@ describe('MessageService Unit Tests', () => {
       vi.mocked(mockConvRepo.findById!).mockResolvedValue({
         _id: new Types.ObjectId(convId),
         participants: [new Types.ObjectId(senderId), new Types.ObjectId(recipientId)],
-      } as any);
+      } as unknown as IConversationDoc);
       vi.mocked(mockMessageRepo.findByClientMessageId!).mockResolvedValue(null);
       vi.mocked(mockMessageRepo.createMessage!).mockResolvedValue(
         mockMessageDoc as unknown as IMessageDoc,
@@ -182,7 +184,7 @@ describe('MessageService Unit Tests', () => {
       vi.mocked(mockConvRepo.findById!).mockResolvedValue({
         _id: new Types.ObjectId(convId),
         participants: [new Types.ObjectId(senderId)],
-      } as any);
+      } as unknown as IConversationDoc);
 
       const updatedDoc = {
         ...mockMessageDoc,

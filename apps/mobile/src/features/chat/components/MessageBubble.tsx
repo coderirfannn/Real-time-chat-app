@@ -30,7 +30,6 @@ export interface MessageBubbleProps {
   onPressReplyPreview?: (targetMessageId: string) => void;
 }
 
-
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -166,10 +165,7 @@ export const MessageBubble = memo(function MessageBubble({
 
       {/* Bubble Row with Quick Web Action Trigger */}
       <View
-        style={[
-          styles.bubbleRow,
-          isOutbound ? styles.bubbleRowOutbound : styles.bubbleRowInbound,
-        ]}
+        style={[styles.bubbleRow, isOutbound ? styles.bubbleRowOutbound : styles.bubbleRowInbound]}
       >
         {/* Quick Action Trigger Button for Web / Touch */}
         {isOutbound && (isHovered || showPicker) && (
@@ -297,7 +293,9 @@ export const MessageBubble = memo(function MessageBubble({
           {/* Timestamp & Status Metadata Row */}
           <View style={styles.metaRow}>
             {showTime && (
-              <Text style={[styles.timeText, isOutbound ? styles.outboundTime : styles.inboundTime]}>
+              <Text
+                style={[styles.timeText, isOutbound ? styles.outboundTime : styles.inboundTime]}
+              >
                 {timeText}
               </Text>
             )}
@@ -638,4 +636,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-

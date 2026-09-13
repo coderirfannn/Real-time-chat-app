@@ -42,26 +42,16 @@ export const ConversationItem = memo(function ConversationItem({
 
       <View style={styles.content}>
         <View style={styles.topRow}>
-          <Text
-            style={[styles.name, hasUnread && styles.nameUnread]}
-            numberOfLines={1}
-          >
+          <Text style={[styles.name, hasUnread && styles.nameUnread]} numberOfLines={1}>
             {displayName}
           </Text>
           {timeText ? (
-            <Text
-              style={[styles.time, hasUnread && styles.timeUnread]}
-            >
-              {timeText}
-            </Text>
+            <Text style={[styles.time, hasUnread && styles.timeUnread]}>{timeText}</Text>
           ) : null}
         </View>
 
         <View style={styles.bottomRow}>
-          <Text
-            style={[styles.snippet, hasUnread && styles.snippetUnread]}
-            numberOfLines={1}
-          >
+          <Text style={[styles.snippet, hasUnread && styles.snippetUnread]} numberOfLines={1}>
             {lastMessageText}
           </Text>
           <Badge count={item.unreadCount} />

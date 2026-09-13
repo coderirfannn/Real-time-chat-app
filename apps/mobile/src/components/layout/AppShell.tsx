@@ -4,11 +4,7 @@
  */
 
 import React from 'react';
-import {
-  View,
-  StyleSheet,
-  useWindowDimensions,
-} from 'react-native';
+import { View, StyleSheet, useWindowDimensions } from 'react-native';
 
 import { BottomTabBar, type MainTabKey } from './BottomTabBar';
 import { NavigationRail } from './NavigationRail';
@@ -20,7 +16,6 @@ export interface AppShellProps {
   showNavigation?: boolean;
   unreadCount?: number;
 }
-
 
 export function AppShell({
   children,
@@ -35,11 +30,7 @@ export function AppShell({
   if (isDesktop) {
     return (
       <View style={styles.desktopRoot}>
-        <NavigationRail
-          activeTab={activeTab}
-          onSelectTab={onSelectTab}
-          unreadCount={unreadCount}
-        />
+        <NavigationRail activeTab={activeTab} onSelectTab={onSelectTab} unreadCount={unreadCount} />
 
         <View style={styles.desktopMainContent}>
           <View style={styles.desktopConstrainedContainer}>{children}</View>
@@ -53,11 +44,7 @@ export function AppShell({
       <View style={styles.mobileContent}>{children}</View>
 
       {showNavigation && (
-        <BottomTabBar
-          activeTab={activeTab}
-          onSelectTab={onSelectTab}
-          unreadCount={unreadCount}
-        />
+        <BottomTabBar activeTab={activeTab} onSelectTab={onSelectTab} unreadCount={unreadCount} />
       )}
     </View>
   );

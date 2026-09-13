@@ -5,13 +5,7 @@
  */
 
 import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Platform,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { brandColors } from '../../theme/colors';
@@ -72,12 +66,7 @@ export function BottomTabBar({
               accessibilityLabel={`${tab.label} tab`}
             >
               {/* Pill-shaped tinted background — the Figma active indicator */}
-              <View
-                style={[
-                  styles.iconPill,
-                  isActive && styles.iconPillActive,
-                ]}
-              >
+              <View style={[styles.iconPill, isActive && styles.iconPillActive]}>
                 <Icon
                   name={tab.icon}
                   size={22}

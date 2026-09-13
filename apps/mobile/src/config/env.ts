@@ -11,15 +11,20 @@ function resolveDevUrl(rawUrl: string | undefined, defaultPath: string): string 
   if (hostUri && Platform.OS !== 'web') {
     const hostIp = hostUri.split(':')[0];
     if (hostIp) {
-      url = url.replace(/(?:localhost|127\.0\.0\.1|\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b)/, hostIp);
+      url = url.replace(
+        /(?:localhost|127\.0\.0\.1|\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b)/,
+        hostIp,
+      );
     }
   } else if (Platform.OS === 'web' && typeof globalThis !== 'undefined') {
     const win = (globalThis as Record<string, unknown>)['window'] as
-      | { location?: { hostname?: string } }
-      | undefined;
+      { location?: { hostname?: string } } | undefined;
     const hostname = win?.location?.hostname;
     if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      url = url.replace(/(?:localhost|127\.0\.0\.1|\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b)/, hostname);
+      url = url.replace(
+        /(?:localhost|127\.0\.0\.1|\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b)/,
+        hostname,
+      );
     }
   }
   return url;

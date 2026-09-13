@@ -6,6 +6,7 @@ import { SocketEvents, type ReceiptUpdatePayload } from '@chatlock/shared-types'
 import type { AuthenticatedSocket } from '../../socket/middleware/auth.socket.middleware.js';
 import type { TypedSocketServer } from '../../socket/index.js';
 import type { ReceiptService } from '../../services/receipt.service.js';
+import type { IConversationDoc } from '../../models/conversation.model.js';
 
 describe('Real-Time Receipts Socket.IO Tests — Task 13 Verification', () => {
   let mockSocket: {
@@ -44,7 +45,7 @@ describe('Real-Time Receipts Socket.IO Tests — Task 13 Verification', () => {
     vi.spyOn(conversationRepository, 'findById').mockResolvedValue({
       _id: validConvId,
       participants: [validUserId, '6a955a298f74016374325513'],
-    } as any);
+    } as unknown as IConversationDoc);
 
     const listeners = new Map<
       string,

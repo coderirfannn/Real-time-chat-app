@@ -92,9 +92,7 @@ export function Button({
             : styles.containerPrimary;
 
   const variantTextStyle =
-    variant === 'outline' || variant === 'ghost'
-      ? styles.textAccent
-      : styles.textWhite;
+    variant === 'outline' || variant === 'ghost' ? styles.textAccent : styles.textWhite;
 
   const spinnerColor =
     variant === 'outline' || variant === 'ghost' ? brandColors.primary : '#FFFFFF';

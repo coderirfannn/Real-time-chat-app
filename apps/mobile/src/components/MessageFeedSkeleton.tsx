@@ -39,42 +39,66 @@ export function MessageFeedSkeleton(): React.JSX.Element {
       {/* Bubble 1: Inbound */}
       <View style={[styles.bubbleRow, styles.inboundRow]}>
         <Animated.View
-          style={[styles.bubble, styles.inboundBubble, { width: 210, height: 48, opacity: pulseAnim }]}
+          style={[
+            styles.bubble,
+            styles.inboundBubble,
+            { width: 210, height: 48, opacity: pulseAnim },
+          ]}
         />
       </View>
 
       {/* Bubble 2: Inbound consecutive */}
       <View style={[styles.bubbleRow, styles.inboundRow]}>
         <Animated.View
-          style={[styles.bubble, styles.inboundBubble, { width: 150, height: 40, opacity: pulseAnim }]}
+          style={[
+            styles.bubble,
+            styles.inboundBubble,
+            { width: 150, height: 40, opacity: pulseAnim },
+          ]}
         />
       </View>
 
       {/* Bubble 3: Outbound */}
       <View style={[styles.bubbleRow, styles.outboundRow]}>
         <Animated.View
-          style={[styles.bubble, styles.outboundBubble, { width: 240, height: 60, opacity: pulseAnim }]}
+          style={[
+            styles.bubble,
+            styles.outboundBubble,
+            { width: 240, height: 60, opacity: pulseAnim },
+          ]}
         />
       </View>
 
       {/* Bubble 4: Inbound */}
       <View style={[styles.bubbleRow, styles.inboundRow]}>
         <Animated.View
-          style={[styles.bubble, styles.inboundBubble, { width: 280, height: 68, opacity: pulseAnim }]}
+          style={[
+            styles.bubble,
+            styles.inboundBubble,
+            { width: 280, height: 68, opacity: pulseAnim },
+          ]}
         />
       </View>
 
       {/* Bubble 5: Outbound */}
       <View style={[styles.bubbleRow, styles.outboundRow]}>
         <Animated.View
-          style={[styles.bubble, styles.outboundBubble, { width: 170, height: 44, opacity: pulseAnim }]}
+          style={[
+            styles.bubble,
+            styles.outboundBubble,
+            { width: 170, height: 44, opacity: pulseAnim },
+          ]}
         />
       </View>
 
       {/* Bubble 6: Outbound consecutive */}
       <View style={[styles.bubbleRow, styles.outboundRow]}>
         <Animated.View
-          style={[styles.bubble, styles.outboundBubble, { width: 120, height: 38, opacity: pulseAnim }]}
+          style={[
+            styles.bubble,
+            styles.outboundBubble,
+            { width: 120, height: 38, opacity: pulseAnim },
+          ]}
         />
       </View>
     </View>

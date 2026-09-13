@@ -72,4 +72,3 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
 });
-

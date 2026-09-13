@@ -69,8 +69,7 @@ export function IconButton({
   const buttonDimensions =
     size === 'sm' ? styles.sizeSm : size === 'lg' ? styles.sizeLg : styles.sizeMd;
 
-  const resolvedIconSize =
-    iconSize || (size === 'sm' ? 16 : size === 'lg' ? 24 : 20);
+  const resolvedIconSize = iconSize || (size === 'sm' ? 16 : size === 'lg' ? 24 : 20);
 
   const defaultColor =
     variant === 'primary'

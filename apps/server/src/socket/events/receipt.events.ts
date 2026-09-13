@@ -52,16 +52,14 @@ export function registerReceiptEvents(
 
       // Broadcast receipt update to conversation room and all participant user rooms
       const room = roomManager.getConversationRoom(validPayload.conversationId);
-      let emitter = io.to(room);
+      const targetRooms: string[] = [room];
       try {
         const conv = await conversationRepo.findById(validPayload.conversationId);
         if (conv && Array.isArray(conv.participants)) {
           for (const pid of conv.participants) {
-            const pStr =
-              (pid as unknown as { _id?: unknown })?._id?.toString() ||
-              pid?.toString();
-            if (pStr && 'to' in emitter && typeof (emitter as any).to === 'function') {
-              emitter = (emitter as any).to(roomManager.getUserRoom(pStr));
+            const pStr = (pid as unknown as { _id?: unknown })?._id?.toString() || pid?.toString();
+            if (pStr) {
+              targetRooms.push(roomManager.getUserRoom(pStr));
             }
           }
         }
@@ -69,8 +67,10 @@ export function registerReceiptEvents(
         // Fallback to room only
       }
 
-      emitter.emit(SocketEvents.MESSAGE_DELIVERED, receiptUpdate);
-      emitter.emit(SocketEvents.MESSAGE_DELIVERED_LEGACY, receiptUpdate);
+      for (const target of targetRooms) {
+        io.to(target).emit(SocketEvents.MESSAGE_DELIVERED, receiptUpdate);
+        io.to(target).emit(SocketEvents.MESSAGE_DELIVERED_LEGACY, receiptUpdate);
+      }
 
       receiptSocketLogger.debug('Broadcasted message:delivered', {
         room,
@@ -127,16 +127,14 @@ export function registerReceiptEvents(
 
       // Broadcast receipt update to conversation room and all participant user rooms
       const room = roomManager.getConversationRoom(validPayload.conversationId);
-      let emitter = io.to(room);
+      const targetRooms: string[] = [room];
       try {
         const conv = await conversationRepo.findById(validPayload.conversationId);
         if (conv && Array.isArray(conv.participants)) {
           for (const pid of conv.participants) {
-            const pStr =
-              (pid as unknown as { _id?: unknown })?._id?.toString() ||
-              pid?.toString();
-            if (pStr && 'to' in emitter && typeof (emitter as any).to === 'function') {
-              emitter = (emitter as any).to(roomManager.getUserRoom(pStr));
+            const pStr = (pid as unknown as { _id?: unknown })?._id?.toString() || pid?.toString();
+            if (pStr) {
+              targetRooms.push(roomManager.getUserRoom(pStr));
             }
           }
         }
@@ -144,8 +142,10 @@ export function registerReceiptEvents(
         // Fallback to room only
       }
 
-      emitter.emit(SocketEvents.MESSAGE_READ, receiptUpdate);
-      emitter.emit(SocketEvents.MESSAGE_READ_LEGACY, receiptUpdate);
+      for (const target of targetRooms) {
+        io.to(target).emit(SocketEvents.MESSAGE_READ, receiptUpdate);
+        io.to(target).emit(SocketEvents.MESSAGE_READ_LEGACY, receiptUpdate);
+      }
 
       receiptSocketLogger.debug('Broadcasted message:read', {
         room,

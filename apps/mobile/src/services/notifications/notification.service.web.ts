@@ -60,7 +60,8 @@ export class WebNotificationService {
     try {
       const globalScope =
         typeof globalThis !== 'undefined' ? (globalThis as Record<string, unknown>) : {};
-      const nav = globalScope['navigator'] as { vibrate?: (pattern: number[]) => boolean } | undefined;
+      const nav = globalScope['navigator'] as
+        { vibrate?: (pattern: number[]) => boolean } | undefined;
       if (nav && typeof nav.vibrate === 'function') {
         nav.vibrate([200, 100, 200]);
       }
@@ -117,8 +118,13 @@ export class WebNotificationService {
   }
 
   public async notifyIncomingMessage(payload: IncomingMessageNotificationPayload): Promise<void> {
-    const { notificationsEnabled, soundEnabled, vibrateEnabled, inAppAlertsEnabled, activeConversationId } =
-      useNotificationStore.getState();
+    const {
+      notificationsEnabled,
+      soundEnabled,
+      vibrateEnabled,
+      inAppAlertsEnabled,
+      activeConversationId,
+    } = useNotificationStore.getState();
 
     if (!notificationsEnabled) return;
     if (activeConversationId === payload.conversationId) return;
@@ -134,7 +140,8 @@ export class WebNotificationService {
     // Browser Notification API for web desktop alerts when outside active chat
     if (inAppAlertsEnabled && activeConversationId !== payload.conversationId) {
       try {
-        const globalScope = typeof globalThis !== 'undefined' ? (globalThis as Record<string, unknown>) : {};
+        const globalScope =
+          typeof globalThis !== 'undefined' ? (globalThis as Record<string, unknown>) : {};
         const NotificationClass = globalScope['Notification'] as
           | { permission: string; new (title: string, opts?: Record<string, unknown>): unknown }
           | undefined;

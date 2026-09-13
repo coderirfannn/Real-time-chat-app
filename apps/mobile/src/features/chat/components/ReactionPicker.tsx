@@ -1,5 +1,13 @@
 import React, { memo, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, ScrollView, Animated } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+  ScrollView,
+  Animated,
+} from 'react-native';
 import { Icon } from '../../../components/ui/Icon';
 
 export const QUICK_EMOJIS = ['❤️', '👍', '😂', '🔥', '😮', '😢', '👏', '🎉'];

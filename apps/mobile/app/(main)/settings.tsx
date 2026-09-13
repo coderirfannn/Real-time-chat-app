@@ -140,30 +140,27 @@ export default function SettingsScreen(): React.JSX.Element {
     }
   }, [displayName, setUser]);
 
-  const handleToggleAppLock = useCallback(
-    async (value: boolean) => {
-      setIsTogglingLock(true);
-      setErrorMessage(null);
+  const handleToggleAppLock = useCallback(async (value: boolean) => {
+    setIsTogglingLock(true);
+    setErrorMessage(null);
 
-      // Verify biometric identity before changing setting
-      const authResult = await biometricsService.authenticate(
-        value ? 'Confirm biometrics to enable App Lock' : 'Confirm identity to disable App Lock',
-      );
+    // Verify biometric identity before changing setting
+    const authResult = await biometricsService.authenticate(
+      value ? 'Confirm biometrics to enable App Lock' : 'Confirm identity to disable App Lock',
+    );
 
-      if (!authResult.success) {
-        setIsTogglingLock(false);
-        setErrorMessage(authResult.error || 'Authentication failed');
-        return;
-      }
-
-      await biometricsService.setAppLockEnabled(value);
-      setIsAppLockEnabled(value);
+    if (!authResult.success) {
       setIsTogglingLock(false);
-      setSuccessMessage(value ? 'ChatLock App Lock enabled' : 'App Lock disabled');
-      setTimeout(() => setSuccessMessage(null), 3000);
-    },
-    [],
-  );
+      setErrorMessage(authResult.error || 'Authentication failed');
+      return;
+    }
+
+    await biometricsService.setAppLockEnabled(value);
+    setIsAppLockEnabled(value);
+    setIsTogglingLock(false);
+    setSuccessMessage(value ? 'ChatLock App Lock enabled' : 'App Lock disabled');
+    setTimeout(() => setSuccessMessage(null), 3000);
+  }, []);
 
   const handleChangePassword = useCallback(async () => {
     setPasswordError(null);
@@ -534,7 +531,8 @@ export default function SettingsScreen(): React.JSX.Element {
           >
             <Text style={styles.modalTitle}>Change Password</Text>
             <Text style={styles.modalSubtitle}>
-              Ensure your new password is at least 8 characters and includes uppercase, lowercase, and numbers.
+              Ensure your new password is at least 8 characters and includes uppercase, lowercase,
+              and numbers.
             </Text>
 
             {passwordError && (

@@ -9,7 +9,10 @@ import {
   SafeAreaView,
   Platform,
 } from 'react-native';
-import { biometricsService, type BiometricCapability } from '../../services/security/biometrics.service';
+import {
+  biometricsService,
+  type BiometricCapability,
+} from '../../services/security/biometrics.service';
 import { Icon } from '../ui/Icon';
 
 interface AppLockModalProps {

@@ -11,7 +11,6 @@ import { spacing } from './spacing';
 import { radius } from './radius';
 import { shadows } from './shadows';
 
-
 export interface Theme {
   isDark: boolean;
   colors: ThemeColors;

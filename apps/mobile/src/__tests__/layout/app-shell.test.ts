@@ -65,4 +65,3 @@ describe('Application Shell & Navigation — Task Phase 2 Verification', () => {
     expect((hiddenShell.props as { showNavigation?: boolean }).showNavigation).toBe(false);
   });
 });
-

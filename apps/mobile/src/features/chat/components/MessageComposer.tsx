@@ -33,12 +33,31 @@ if (Platform.OS === 'android' && UIManager?.setLayoutAnimationEnabledExperimenta
 }
 
 export const COMPOSER_EMOJIS = [
-  '😊', '😂', '😍', '👍', '🔥', '🎉', '❤️', '🙏', '✨', '🚀', '💯', '😎', '👀', '💪', '🤝', '👋',
+  '😊',
+  '😂',
+  '😍',
+  '👍',
+  '🔥',
+  '🎉',
+  '❤️',
+  '🙏',
+  '✨',
+  '🚀',
+  '💯',
+  '😎',
+  '👀',
+  '💪',
+  '🤝',
+  '👋',
 ];
 
 export interface MessageComposerProps {
   conversationId?: string;
-  onSendMessage: (content: string, attachments?: MessageAttachment[], replyToMessageId?: string) => void;
+  onSendMessage: (
+    content: string,
+    attachments?: MessageAttachment[],
+    replyToMessageId?: string,
+  ) => void;
   onTypingStart?: () => void;
   onTypingStop?: () => void;
   replyingTo?: LocalMessage | null;
@@ -73,9 +92,7 @@ export function MessageComposer({
   const bottomPadding = Math.max(insets.bottom, 8);
 
   const defaultPlaceholder =
-    Platform.OS === 'web' && windowWidth > 500
-      ? 'Type a message... (Enter to send)'
-      : 'Message...';
+    Platform.OS === 'web' && windowWidth > 500 ? 'Type a message... (Enter to send)' : 'Message...';
   const effectivePlaceholder = placeholder || defaultPlaceholder;
 
   const [text, setText] = useState('');
@@ -91,7 +108,11 @@ export function MessageComposer({
   const sendScaleAnim = useRef(new Animated.Value(1)).current;
 
   const triggerLayoutAnimation = useCallback(() => {
-    if (Platform.OS !== 'web' && typeof LayoutAnimation !== 'undefined' && LayoutAnimation?.configureNext) {
+    if (
+      Platform.OS !== 'web' &&
+      typeof LayoutAnimation !== 'undefined' &&
+      LayoutAnimation?.configureNext
+    ) {
       try {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       } catch {
@@ -410,7 +431,8 @@ export function MessageComposer({
         <View style={styles.replyBanner}>
           <View style={styles.replyBannerContent}>
             <Text style={styles.replyBannerHeader}>
-              Replying to {replyingTo?.sender?.displayName || replyingTo?.sender?.username || 'user'}
+              Replying to{' '}
+              {replyingTo?.sender?.displayName || replyingTo?.sender?.username || 'user'}
             </Text>
             <Text style={styles.replyBannerSnippet} numberOfLines={1}>
               {replyingTo?.content || '[Attachment]'}
@@ -466,7 +488,9 @@ export function MessageComposer({
                   <ActivityIndicator size="small" color="#38BDF8" style={styles.stageIndicator} />
                 )}
 
-                {item.status === 'failed' && <Icon name="alert-circle" size={14} color="#F75555" style={styles.failedBadge} />}
+                {item.status === 'failed' && (
+                  <Icon name="alert-circle" size={14} color="#F75555" style={styles.failedBadge} />
+                )}
 
                 <TouchableOpacity
                   onPress={() => handleRemoveStaged(item.id)}
@@ -533,11 +557,7 @@ export function MessageComposer({
           hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
           accessibilityLabel="Toggle emoji drawer"
         >
-          <Icon
-            name="smile"
-            size={20}
-            color={showEmojiDrawer ? '#246BFD' : '#A0A5B5'}
-          />
+          <Icon name="smile" size={20} color={showEmojiDrawer ? '#246BFD' : '#A0A5B5'} />
         </TouchableOpacity>
 
         {/* Text Input Wrapper */}
@@ -576,13 +596,13 @@ export function MessageComposer({
             hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             accessibilityLabel="Send message"
             // @ts-expect-error web pointer down handler prevents blur on web/mobile browsers
-            onMouseDown={Platform.OS === 'web' ? (e: { preventDefault?: () => void }) => e?.preventDefault?.() : undefined}
+            onMouseDown={
+              Platform.OS === 'web'
+                ? (e: { preventDefault?: () => void }) => e?.preventDefault?.()
+                : undefined
+            }
           >
-            <Icon
-              name="send"
-              size={16}
-              color={canSend ? '#FFFFFF' : '#616675'}
-            />
+            <Icon name="send" size={16} color={canSend ? '#FFFFFF' : '#616675'} />
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -819,4 +839,3 @@ const styles = StyleSheet.create({
     color: '#757B8C',
   },
 });
-

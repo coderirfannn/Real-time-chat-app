@@ -66,7 +66,8 @@ export class NotificationService {
       if (Platform.OS === 'web') {
         const globalScope =
           typeof globalThis !== 'undefined' ? (globalThis as Record<string, unknown>) : {};
-        const nav = globalScope['navigator'] as { vibrate?: (pattern: number[]) => boolean } | undefined;
+        const nav = globalScope['navigator'] as
+          { vibrate?: (pattern: number[]) => boolean } | undefined;
         if (nav && typeof nav.vibrate === 'function') {
           nav.vibrate([200, 100, 200]);
         }
@@ -162,7 +163,8 @@ export class NotificationService {
     // 3. Desktop / Browser Notification if available and outside active chat
     if (inAppAlertsEnabled && activeConversationId !== payload.conversationId) {
       try {
-        const globalScope = typeof globalThis !== 'undefined' ? (globalThis as Record<string, unknown>) : {};
+        const globalScope =
+          typeof globalThis !== 'undefined' ? (globalThis as Record<string, unknown>) : {};
         const NotificationClass = globalScope['Notification'] as
           | { permission: string; new (title: string, opts?: Record<string, unknown>): unknown }
           | undefined;

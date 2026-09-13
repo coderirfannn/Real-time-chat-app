@@ -92,4 +92,3 @@ vi.mock('expo-notifications', () => ({
     MIN: 1,
   },
 }));
-

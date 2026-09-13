@@ -200,11 +200,7 @@ export default function RegisterScreen(): React.JSX.Element {
                     accessibilityRole="button"
                     accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    <Icon
-                      name={showPassword ? 'eye-off' : 'eye'}
-                      size={18}
-                      color="#757B8C"
-                    />
+                    <Icon name={showPassword ? 'eye-off' : 'eye'} size={18} color="#757B8C" />
                   </TouchableOpacity>
                 }
               />

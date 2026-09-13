@@ -4,13 +4,7 @@
  */
 
 import React from 'react';
-import {
-  View,
-  TouchableOpacity,
-  StyleSheet,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
+import { View, TouchableOpacity, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
 export interface CardProps {
   children?: React.ReactNode;
@@ -19,7 +13,6 @@ export interface CardProps {
   padding?: 'none' | 'sm' | 'md' | 'lg';
   activeOpacity?: number;
 }
-
 
 export function Card({
   children,

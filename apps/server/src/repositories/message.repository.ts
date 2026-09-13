@@ -179,11 +179,7 @@ export class MessageRepository extends BaseRepository<IMessageDoc> {
 
     if (hasReaction) {
       updatedDoc = await this.model
-        .findByIdAndUpdate(
-          messageId,
-          { $pull: { reactions: { userId, emoji } } },
-          { new: true },
-        )
+        .findByIdAndUpdate(messageId, { $pull: { reactions: { userId, emoji } } }, { new: true })
         .populate('senderId', SENDER_FIELDS)
         .exec();
       action = 'removed';

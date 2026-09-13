@@ -60,10 +60,11 @@ export class MessageService {
       if (typeof this.conversationRepo.findById === 'function') {
         const conv = await this.conversationRepo.findById(cleanConvId);
         if (conv && Array.isArray(conv.participants) && conv.participants.length > 0) {
-          participantIds = conv.participants.map((p: unknown) =>
-            (p as { _id?: Types.ObjectId; id?: string })?._id?.toString() ||
-            (p as { id?: string })?.id ||
-            (p as Types.ObjectId).toString(),
+          participantIds = conv.participants.map(
+            (p: unknown) =>
+              (p as { _id?: Types.ObjectId; id?: string })?._id?.toString() ||
+              (p as { id?: string })?.id ||
+              (p as Types.ObjectId).toString(),
           );
         }
       }
@@ -194,10 +195,11 @@ export class MessageService {
       if (typeof this.conversationRepo.findById === 'function') {
         const conv = await this.conversationRepo.findById(cleanConvId);
         if (conv && Array.isArray(conv.participants) && conv.participants.length > 0) {
-          participantIds = conv.participants.map((p: unknown) =>
-            (p as { _id?: Types.ObjectId; id?: string })?._id?.toString() ||
-            (p as { id?: string })?.id ||
-            (p as Types.ObjectId).toString(),
+          participantIds = conv.participants.map(
+            (p: unknown) =>
+              (p as { _id?: Types.ObjectId; id?: string })?._id?.toString() ||
+              (p as { id?: string })?.id ||
+              (p as Types.ObjectId).toString(),
           );
         }
       }

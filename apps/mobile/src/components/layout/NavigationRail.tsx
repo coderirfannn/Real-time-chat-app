@@ -6,13 +6,7 @@
  */
 
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Platform,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { brandColors } from '../../theme/colors';
 import { Avatar } from '../Avatar';
 import { Badge } from '../Badge';
@@ -50,10 +44,7 @@ export function NavigationRail({
 
   return (
     <View
-      style={[
-        styles.container,
-        isCollapsed ? styles.containerCollapsed : styles.containerExpanded,
-      ]}
+      style={[styles.container, isCollapsed ? styles.containerCollapsed : styles.containerExpanded]}
     >
       {/* Brand Header */}
       <View style={styles.brandRow}>
@@ -74,11 +65,7 @@ export function NavigationRail({
           activeOpacity={0.7}
           accessibilityLabel={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          <Icon
-            name={isCollapsed ? 'chevron-right' : 'chevron-left'}
-            size={13}
-            color="#757B8C"
-          />
+          <Icon name={isCollapsed ? 'chevron-right' : 'chevron-left'} size={13} color="#757B8C" />
         </TouchableOpacity>
       </View>
 
@@ -116,12 +103,7 @@ export function NavigationRail({
               {/* Label + badge count in expanded mode */}
               {!isCollapsed && (
                 <View style={styles.navLabelRow}>
-                  <Text
-                    style={[
-                      styles.navLabel,
-                      isActive && styles.navLabelActive,
-                    ]}
-                  >
+                  <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>
                     {tab.label}
                   </Text>
 

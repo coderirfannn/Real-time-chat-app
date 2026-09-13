@@ -40,7 +40,6 @@ export function getAvatarAccessibilityLabel(name: string, isOnline?: boolean): s
 }
 
 export function Avatar({
-
   name,
   avatarUrl,
   size = 'md',
@@ -51,7 +50,6 @@ export function Avatar({
 }: AvatarProps): React.JSX.Element {
   const initials = useMemo(() => getInitials(name), [name]);
   const backgroundColor = useMemo(() => getAvatarColor(name), [name]);
-
 
   const sizeStyle =
     size === 'xs'
@@ -90,9 +88,7 @@ export function Avatar({
     <View
       style={[styles.wrapper, sizeStyle, hasRing ? styles.ringWrapper : null]}
       accessibilityRole={accessibilityRole}
-      accessibilityLabel={
-        accessibilityLabel || getAvatarAccessibilityLabel(name, isOnline)
-      }
+      accessibilityLabel={accessibilityLabel || getAvatarAccessibilityLabel(name, isOnline)}
     >
       {avatarUrl ? (
         <Image source={{ uri: avatarUrl }} style={[styles.image, sizeStyle]} />
