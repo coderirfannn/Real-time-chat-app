@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { conversationApi } from '../../../services/api/conversation.api';
 import { socketManager } from '../../../services/socket/socket.manager';
 import { useAuthStore } from '../../../store/auth.store';
+import { useNotificationStore } from '../../../store/notification.store';
 import type { IMessage, UserProfile, PresenceUpdatePayload } from '@chatlock/shared-types';
 import type { ConversationItemData } from '../../../types/chat.types';
 
@@ -25,9 +26,14 @@ interface ConversationApiItem {
   updatedAt?: string;
 }
 
+// Module-level deduplication cache to prevent duplicate unread increments across multiple hook instances
+const processedIncomingMessageIds = new Set<string>();
+
 export function useConversations() {
   const queryClient = useQueryClient();
-  const currentUserId = useAuthStore((state) => state.user?.id);
+  const currentUser = useAuthStore((state) => state.user);
+  const currentUserId = currentUser?.id || (currentUser as { _id?: string })?._id || '';
+  const activeConvId = useNotificationStore((state) => state.activeConversationId);
 
   const {
     data: rawData,
@@ -45,31 +51,74 @@ export function useConversations() {
   // Socket listener for new messages to update conversation preview and sort
   const handleNewMessage = useCallback(
     (message: IMessage) => {
+      const msgUniqueKey =
+        message.id ||
+        message.clientMessageId ||
+        `${message.conversationId}_${message.createdAt}_${message.content}`;
+
+      if (processedIncomingMessageIds.has(msgUniqueKey)) {
+        return;
+      }
+      processedIncomingMessageIds.add(msgUniqueKey);
+      if (processedIncomingMessageIds.size > 500) {
+        const first = processedIncomingMessageIds.values().next().value;
+        if (first) processedIncomingMessageIds.delete(first);
+      }
+
       queryClient.setQueryData(CONVERSATIONS_QUERY_KEY, (oldData: unknown) => {
         if (!oldData) return oldData;
         const list = Array.isArray(oldData)
           ? oldData
           : (oldData as { docs?: ConversationApiItem[] }).docs || [];
 
+        const exists = list.some(
+          (item: ConversationApiItem) => (item.id || item._id) === message.conversationId,
+        );
+
+        if (!exists) {
+          queryClient.invalidateQueries({ queryKey: CONVERSATIONS_QUERY_KEY });
+          return oldData;
+        }
+
+        const activeConvId = useNotificationStore.getState().activeConversationId;
+        const isViewing = activeConvId === message.conversationId;
+
         const updated = list.map((item: ConversationApiItem) => {
           const itemId = item.id || item._id;
           if (itemId === message.conversationId) {
-            const isSender =
-              (typeof message.senderId === 'string'
+            const user = useAuthStore.getState().user;
+            const myUserId = user?.id || (user as { _id?: string })?._id || currentUserId;
+
+            const senderIdStr =
+              typeof message.senderId === 'string'
                 ? message.senderId
-                : (message.senderId as { id?: string; _id?: string }).id) === currentUserId;
+                : (message.senderId as { id?: string; _id?: string })?.id ||
+                  (message.senderId as { id?: string; _id?: string })?._id ||
+                  String(message.senderId || '');
+
+            const isSender = Boolean(myUserId && senderIdStr && senderIdStr === myUserId);
+
+            // If this message was already applied to the item, do not increment unreadCount again
+            const isSameMessage =
+              item.lastMessageAt === message.createdAt &&
+              item.lastMessage?.content === message.content;
+
+            if (isSameMessage) {
+              return item;
+            }
+
+            const newLastMessage = {
+              id: message.id,
+              content: message.content,
+              senderId: senderIdStr,
+              createdAt: message.createdAt,
+            };
             return {
               ...item,
-              lastMessage: {
-                content: message.content,
-                senderId:
-                  typeof message.senderId === 'string'
-                    ? message.senderId
-                    : (message.senderId as { id?: string }).id,
-                createdAt: message.createdAt,
-              },
+              lastMessage: newLastMessage,
+              lastMessageId: newLastMessage,
               lastMessageAt: message.createdAt,
-              unreadCount: isSender ? item.unreadCount || 0 : (item.unreadCount || 0) + 1,
+              unreadCount: isSender || isViewing ? 0 : (item.unreadCount || 0) + 1,
             };
           }
           return item;
@@ -91,7 +140,10 @@ export function useConversations() {
   // Socket listener for read receipts to clear unread counters
   const handleMessageRead = useCallback(
     (payload: { conversationId: string; userId: string }) => {
-      if (payload.userId === currentUserId) {
+      const user = useAuthStore.getState().user;
+      const myUserId = user?.id || (user as { _id?: string })?._id || currentUserId;
+
+      if (!payload.userId || payload.userId === myUserId) {
         queryClient.setQueryData(CONVERSATIONS_QUERY_KEY, (oldData: unknown) => {
           if (!oldData) return oldData;
           const list = Array.isArray(oldData)
@@ -189,9 +241,20 @@ export function useConversations() {
       }
 
       const lastMsg =
-        conv.lastMessageId && typeof conv.lastMessageId === 'object'
+        conv.lastMessage ||
+        (conv.lastMessageId && typeof conv.lastMessageId === 'object'
           ? (conv.lastMessageId as { content?: string; senderId?: string; createdAt?: string })
-          : conv.lastMessage;
+          : undefined);
+
+      const rawSender = lastMsg?.senderId;
+      const lastSenderId =
+        typeof rawSender === 'string'
+          ? rawSender
+          : (rawSender as unknown as { id?: string; _id?: string })?.id ||
+            (rawSender as unknown as { id?: string; _id?: string })?._id ||
+            (rawSender ? String(rawSender) : '');
+
+      const isLastSenderMe = Boolean(currentUserId && lastSenderId && lastSenderId === currentUserId);
 
       return {
         id: convId,
@@ -199,16 +262,16 @@ export function useConversations() {
         lastMessage: lastMsg
           ? {
               content: lastMsg.content || '',
-              senderId: typeof lastMsg.senderId === 'string' ? lastMsg.senderId : '',
+              senderId: lastSenderId,
               createdAt: lastMsg.createdAt || conv.lastMessageAt || '',
             }
           : undefined,
         lastMessageAt: conv.lastMessageAt || conv.updatedAt,
-        unreadCount: conv.unreadCount || 0,
+        unreadCount: activeConvId === convId || isLastSenderMe ? 0 : (conv.unreadCount || 0),
         isOnline: recipient.status === 'online',
       };
     });
-  }, [rawData, currentUserId]);
+  }, [rawData, currentUserId, activeConvId]);
 
   return {
     conversations,

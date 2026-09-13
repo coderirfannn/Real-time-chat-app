@@ -42,4 +42,10 @@ router.get(
   asyncHandler(conversationController.listMessages),
 );
 
+router.post(
+  '/:id/read',
+  validate({ params: conversationIdParamsSchema }),
+  asyncHandler(conversationController.markAsRead),
+);
+
 export default router;

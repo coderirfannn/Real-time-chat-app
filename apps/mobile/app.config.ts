@@ -22,11 +22,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'automatic',
-    splash: {
-      image: './assets/splash.png',
-      resizeMode: 'contain',
-      backgroundColor: '#0F172A',
-    },
+    plugins: ['expo-router', 'expo-secure-store'],
     ios: {
       supportsTablet: false,
       bundleIdentifier: bundleId,

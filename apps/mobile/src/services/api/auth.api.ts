@@ -1,5 +1,10 @@
 import { apiClient } from './client';
-import type { LoginInput, RegisterInput, RefreshTokenInput } from '@chatlock/validation';
+import type {
+  LoginInput,
+  RegisterInput,
+  RefreshTokenInput,
+  ChangePasswordInput,
+} from '@chatlock/validation';
 import type { AuthResponse, UserProfile } from '@chatlock/shared-types';
 
 export class AuthApi {
@@ -17,6 +22,10 @@ export class AuthApi {
 
   public async getMe(): Promise<UserProfile> {
     return apiClient.get<UserProfile>('/auth/me');
+  }
+
+  public async changePassword(input: ChangePasswordInput): Promise<{ success: boolean }> {
+    return apiClient.post<{ success: boolean }>('/auth/change-password', input);
   }
 
   public async logout(refreshToken: string): Promise<{ message: string }> {

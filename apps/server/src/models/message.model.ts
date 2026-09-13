@@ -1,5 +1,5 @@
 import mongoose, { Schema, type Document, type Model, type Types } from 'mongoose';
-import type { MessageType, MessageAttachment } from '@chatlock/shared-types';
+import type { MessageType, MessageAttachment, MessageReaction } from '@chatlock/shared-types';
 
 export interface IMessageDoc extends Document {
   conversationId: Types.ObjectId;
@@ -8,6 +8,7 @@ export interface IMessageDoc extends Document {
   type: MessageType;
   content: string;
   attachments?: MessageAttachment[];
+  reactions?: MessageReaction[];
   replyToMessageId?: Types.ObjectId;
   editedAt?: Date | null;
   deletedAt?: Date | null;
@@ -24,6 +25,15 @@ const attachmentSchema = new Schema<MessageAttachment>(
     mimeType: { type: String, required: true },
     thumbnailUrl: { type: String },
     duration: { type: Number },
+  },
+  { _id: false },
+);
+
+const reactionSchema = new Schema<MessageReaction>(
+  {
+    emoji: { type: String, required: true },
+    userId: { type: String, required: true },
+    createdAt: { type: String, required: true },
   },
   { _id: false },
 );
@@ -67,6 +77,10 @@ const messageSchema = new Schema<IMessageDoc>(
       type: Schema.Types.ObjectId,
       ref: 'Message',
       default: undefined,
+    },
+    reactions: {
+      type: [reactionSchema],
+      default: [],
     },
     editedAt: {
       type: Date,

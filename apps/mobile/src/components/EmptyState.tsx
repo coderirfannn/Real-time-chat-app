@@ -1,11 +1,16 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import { Button } from './ui/Button';
+import { Icon } from './ui/Icon';
+import { brandColors } from '../theme/colors';
 
 export interface EmptyStateProps {
   title: string;
   description: string;
   actionLabel?: string;
   onAction?: () => void;
+  icon?: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function EmptyState({
@@ -13,18 +18,33 @@ export function EmptyState({
   description,
   actionLabel,
   onAction,
+  icon,
+  style,
 }: EmptyStateProps): React.JSX.Element {
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, style]}>
       <View style={styles.iconCircle}>
-        <Text style={styles.icon}>💬</Text>
+        {icon ? (
+          typeof icon === 'string' ? (
+            <Icon name={icon as never} size={36} color={brandColors.primary} />
+          ) : (
+            icon
+          )
+        ) : (
+          <Icon name="chat" size={36} color={brandColors.primary} />
+        )}
       </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.description}>{description}</Text>
       {actionLabel && onAction && (
-        <TouchableOpacity style={styles.actionButton} onPress={onAction} activeOpacity={0.8}>
-          <Text style={styles.actionText}>{actionLabel}</Text>
-        </TouchableOpacity>
+        <View style={styles.actionWrapper}>
+          <Button
+            title={actionLabel}
+            variant="primary"
+            size="md"
+            onPress={onAction}
+          />
+        </View>
       )}
     </View>
   );
@@ -35,46 +55,38 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    paddingHorizontal: 32,
+    paddingVertical: 48,
   },
   iconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#1E293B',
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    // Soft primary tint — Figma E-Chat empty state pattern (no border)
+    backgroundColor: 'rgba(36, 107, 253, 0.10)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
+    marginBottom: 20,
   },
-  icon: {
-    fontSize: 28,
+  iconText: {
+    fontSize: 32,
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#F8FAFC',
-    marginBottom: 6,
+    color: '#FFFFFF',
+    marginBottom: 8,
     textAlign: 'center',
+    letterSpacing: 0.2,
   },
   description: {
     fontSize: 14,
-    color: '#94A3B8',
+    color: '#A0A5B5',
     textAlign: 'center',
-    lineHeight: 20,
-    maxWidth: 280,
+    lineHeight: 21,
+    maxWidth: 300,
   },
-  actionButton: {
-    marginTop: 20,
-    backgroundColor: '#0284C7',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  actionText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
+  actionWrapper: {
+    marginTop: 24,
   },
 });

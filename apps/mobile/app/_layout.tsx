@@ -7,6 +7,9 @@ import { StatusBar } from 'expo-status-bar';
 import { useAuthStore } from '../src/store/auth.store';
 import { socketManager } from '../src/services/socket/socket.manager';
 import { useAppLifecycle } from '../src/hooks/useAppLifecycle';
+import { AppLockModal } from '../src/components/security/AppLockModal';
+import { biometricsService } from '../src/services/security/biometrics.service';
+import { useNotificationListener } from '../src/hooks/useNotificationListener';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,8 +25,34 @@ function AuthLifecycleManager({ children }: { children: React.ReactNode }) {
   const { accessToken, isAuthenticated, isLoading, hydrateAuth } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
+  const [isLocked, setIsLocked] = React.useState(false);
 
-  useAppLifecycle();
+  useEffect(() => {
+    if (isAuthenticated) {
+      biometricsService.isAppLockEnabled().then((enabled) => {
+        if (enabled) {
+          setIsLocked(true);
+        }
+      });
+    }
+  }, [isAuthenticated]);
+
+  const lifecycleOptions = React.useMemo(
+    () => ({
+      onResume: async () => {
+        if (isAuthenticated) {
+          const enabled = await biometricsService.isAppLockEnabled();
+          if (enabled) {
+            setIsLocked(true);
+          }
+        }
+      },
+    }),
+    [isAuthenticated],
+  );
+
+  useAppLifecycle(lifecycleOptions);
+  useNotificationListener();
 
   useEffect(() => {
     hydrateAuth();
@@ -46,6 +75,7 @@ function AuthLifecycleManager({ children }: { children: React.ReactNode }) {
       socketManager.connect(accessToken);
     } else {
       socketManager.disconnect();
+      queryClient.clear();
     }
   }, [isAuthenticated, accessToken]);
 
@@ -54,17 +84,24 @@ function AuthLifecycleManager({ children }: { children: React.ReactNode }) {
       <View
         style={{
           flex: 1,
-          backgroundColor: '#0F172A',
+          backgroundColor: '#181A20',
           justifyContent: 'center',
           alignItems: 'center',
         }}
       >
-        <ActivityIndicator size="large" color="#38BDF8" />
+        <ActivityIndicator size="large" color="#246BFD" />
       </View>
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {isAuthenticated && isLocked && (
+        <AppLockModal isVisible={isLocked} onUnlocked={() => setIsLocked(false)} />
+      )}
+    </>
+  );
 }
 
 export default function RootLayout() {
@@ -76,7 +113,7 @@ export default function RootLayout() {
           <Stack
             screenOptions={{
               headerShown: false,
-              contentStyle: { backgroundColor: '#0F172A' },
+              contentStyle: { backgroundColor: '#181A20' },
             }}
           >
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -87,3 +124,4 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+

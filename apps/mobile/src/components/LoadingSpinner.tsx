@@ -8,7 +8,7 @@ export interface LoadingSpinnerProps {
 
 export function LoadingSpinner({
   size = 'large',
-  color = '#0284C7',
+  color = '#246BFD',
 }: LoadingSpinnerProps): React.JSX.Element {
   return (
     <View style={styles.container}>
@@ -22,6 +22,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0F172A',
+    backgroundColor: 'transparent',
   },
 });

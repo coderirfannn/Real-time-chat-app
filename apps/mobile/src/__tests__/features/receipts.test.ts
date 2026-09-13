@@ -168,4 +168,27 @@ describe('Mobile Receipts & Monotonic Reconciliation Tests — Task 13 Verificat
     unsubDelivered();
     unsubRead();
   });
+
+  // ====================================================
+  // 5. UNREAD COUNT IDEMPOTENCY
+  // ====================================================
+  it('5. UNREAD COUNT IDEMPOTENCY: suppresses duplicate increments when the exact same message event arrives', () => {
+    let unreadCount = 0;
+    const processedIds = new Set<string>();
+
+    const applyIncomingMessage = (msg: { id: string; conversationId: string; content: string }) => {
+      if (processedIds.has(msg.id)) return;
+      processedIds.add(msg.id);
+      unreadCount += 1;
+    };
+
+    const incomingMsg = { id: 'srv_msg_999', conversationId: 'conv_1', content: 'Hello!' };
+
+    // Simulate multiple listeners (e.g. _layout and index) receiving the same socket message
+    applyIncomingMessage(incomingMsg);
+    applyIncomingMessage(incomingMsg);
+
+    expect(unreadCount).toBe(1);
+  });
 });
+

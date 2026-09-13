@@ -45,7 +45,7 @@ export function initSocketServer(httpServer: HttpServer): TypedSocketServer {
     SocketData
   >(httpServer, {
     cors: {
-      origin: config.socket.corsOrigins,
+      origin: config.socket.corsOrigins.includes('*') ? true : config.socket.corsOrigins,
       credentials: true,
     },
     pingTimeout: config.socket.pingTimeout,

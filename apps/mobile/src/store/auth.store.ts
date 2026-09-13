@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { UserProfile, AuthResponse } from '@chatlock/shared-types';
 import { secureStorage } from '../services/storage/secure-storage.service';
 import { authApi } from '../services/api/auth.api';
+import { apiClient } from '../services/api/client';
 
 export interface AuthState {
   user: UserProfile | null;
@@ -15,6 +16,35 @@ export interface AuthState {
   setUser: (user: UserProfile) => void;
   setTokens: (accessToken: string, refreshToken: string) => Promise<void>;
   logout: () => Promise<void>;
+}
+
+function isTokenExpired(token: string): boolean {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return false; // If non-JWT format (e.g. mock test tokens), do not assume expired
+    }
+    const payloadPart = parts[1];
+    if (!payloadPart) {
+      return false;
+    }
+    let base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) {
+      base64 += '=';
+    }
+    const jsonPayload =
+      typeof atob === 'function'
+        ? atob(base64)
+        : Buffer.from(base64, 'base64').toString('binary');
+    const payload = JSON.parse(jsonPayload);
+    if (typeof payload.exp === 'number') {
+      // Buffer of 10 seconds before expiration
+      return Date.now() >= payload.exp * 1000 - 10000;
+    }
+  } catch {
+    return false;
+  }
+  return false;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -51,15 +81,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
       }
 
+      let validAccessToken = accessToken;
+      let validRefreshToken = refreshToken;
+
+      // If the access token has expired while app was closed or idle, proactively refresh
+      if (isTokenExpired(accessToken)) {
+        const freshAccessToken = await apiClient.handleTokenRefresh();
+        if (freshAccessToken) {
+          validAccessToken = freshAccessToken;
+          validRefreshToken = (await secureStorage.getItem('refresh_token')) || refreshToken;
+        } else {
+          // Refresh token expired or revoked - clear session cleanly
+          await get().logout();
+          return;
+        }
+      }
+
       set({
         user: parsedUser,
-        accessToken,
-        refreshToken,
+        accessToken: validAccessToken,
+        refreshToken: validRefreshToken,
         isAuthenticated: true,
         isLoading: false,
       });
 
-      // Background validation of session
+      // Background validation of session to ensure freshness
       try {
         const currentUser = await authApi.getMe();
         if (currentUser && currentUser.id) {
@@ -67,7 +113,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           await secureStorage.setItem('user_data', JSON.stringify(currentUser));
         }
       } catch {
-        // If getMe fails and cannot be refreshed, let the interceptor handle logout
+        // If getMe fails and cannot be refreshed, the interceptor handles logout
       }
     } catch {
       set({
@@ -129,3 +175,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
   },
 }));
+
+// Bidirectional synchronization between ApiClient token rotation and useAuthStore
+apiClient.setTokenUpdateHandler((accessToken, refreshToken) => {
+  useAuthStore.getState().setTokens(accessToken, refreshToken);
+});
+
+apiClient.setAuthFailureHandler(() => {
+  useAuthStore.getState().logout();
+});

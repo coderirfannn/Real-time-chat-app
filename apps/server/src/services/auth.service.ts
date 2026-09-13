@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import { loadServerConfig } from '@chatlock/config';
-import type { RegisterInput, LoginInput } from '@chatlock/validation';
+import type { RegisterInput, LoginInput, ChangePasswordInput } from '@chatlock/validation';
 import type { AuthResponse, UserProfile } from '@chatlock/shared-types';
 import { userRepository, type UserRepository } from '../repositories/user.repository.js';
 import { sessionRepository, type SessionRepository } from '../repositories/session.repository.js';
@@ -17,6 +17,7 @@ import {
   UnauthorizedError,
   NotFoundError,
   BadRequestError,
+  RateLimitExceededError,
 } from '../errors/app-error.js';
 import { logger } from '../utils/logger.js';
 
@@ -24,6 +25,15 @@ const authLogger = logger.child('AuthService');
 
 // Precomputed dummy hash for constant-time comparison on nonexistent users (timing attack mitigation)
 const DUMMY_HASH = '$2b$12$e8Y/3W7fJ8qG1Fj1uRzYmO9kR9lP5xO1hG7tK9vL3mQ1aB3cE5g2y';
+
+// Sliding window lockout tracking for repeated failed attempts
+interface FailedAttemptRecord {
+  count: number;
+  lockedUntil?: number;
+}
+const failedAttemptsMap = new Map<string, FailedAttemptRecord>();
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes lockout
 
 export class AuthService {
   constructor(
@@ -115,21 +125,52 @@ export class AuthService {
    */
   public async login(input: LoginInput): Promise<AuthResponse> {
     const config = loadServerConfig();
-    const identifier = input.identifier.trim();
+    const identifier = input.identifier.toLowerCase().trim();
+
+    // Check if identifier is currently locked out
+    const attemptRecord = failedAttemptsMap.get(identifier);
+    if (attemptRecord && attemptRecord.lockedUntil && attemptRecord.lockedUntil > Date.now()) {
+      const minutesRemaining = Math.ceil((attemptRecord.lockedUntil - Date.now()) / 60000);
+      throw new RateLimitExceededError(
+        `Account temporarily locked due to consecutive failed login attempts. Please try again in ${minutesRemaining} minute(s).`,
+      );
+    }
+
+    const recordFailedAttempt = () => {
+      const current = failedAttemptsMap.get(identifier) || { count: 0 };
+      const nextCount = current.count + 1;
+      if (nextCount >= MAX_FAILED_ATTEMPTS) {
+        failedAttemptsMap.set(identifier, {
+          count: nextCount,
+          lockedUntil: Date.now() + LOCKOUT_DURATION_MS,
+        });
+        authLogger.warn('Account temporarily locked after max failed attempts', {
+          identifier,
+          maxAttempts: MAX_FAILED_ATTEMPTS,
+        });
+      } else {
+        failedAttemptsMap.set(identifier, { count: nextCount });
+      }
+    };
 
     // 1. Find user with passwordHash
     const user = await this.userRepo.findByIdentifierWithPassword(identifier);
     if (!user) {
       // Perform constant-time dummy verification to eliminate timing oracle vulnerabilities
       await verifyPassword(input.password, DUMMY_HASH);
+      recordFailedAttempt();
       throw new UnauthorizedError('Invalid email/username or password');
     }
 
     // 2. Verify password
     const isPasswordValid = await verifyPassword(input.password, user.passwordHash);
     if (!isPasswordValid) {
+      recordFailedAttempt();
       throw new UnauthorizedError('Invalid email/username or password');
     }
+
+    // Successful login clears failed attempt tracking
+    failedAttemptsMap.delete(identifier);
 
     const userId = user._id.toString();
     const deviceId = input.deviceId || 'default-device';
@@ -325,6 +366,41 @@ export class AuthService {
 
     authLogger.info('User profile updated', { userId: cleanUserId });
     return updated.toJSON() as unknown as UserProfile;
+  }
+
+  /**
+   * Changes an authenticated user's password and revokes all active sessions for security.
+   */
+  public async changePassword(userId: string, input: ChangePasswordInput): Promise<void> {
+    const cleanUserId = userId.trim();
+    if (!Types.ObjectId.isValid(cleanUserId)) {
+      throw new BadRequestError('Invalid user ID format');
+    }
+
+    const user = await this.userRepo.findByIdWithPassword(cleanUserId);
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    const isCurrentValid = await verifyPassword(input.currentPassword, user.passwordHash);
+    if (!isCurrentValid) {
+      throw new UnauthorizedError('Current password is incorrect');
+    }
+
+    const isSamePassword = await verifyPassword(input.newPassword, user.passwordHash);
+    if (isSamePassword) {
+      throw new BadRequestError('New password cannot be the same as the current password');
+    }
+
+    const newPasswordHash = await hashPassword(input.newPassword);
+    await this.userRepo.updateById(cleanUserId, { passwordHash: newPasswordHash });
+
+    // Revoke all existing sessions across all devices
+    await this.sessionRepo.revokeAllUserSessions(cleanUserId);
+
+    authLogger.info('User changed password successfully and revoked all sessions', {
+      userId: cleanUserId,
+    });
   }
 }
 

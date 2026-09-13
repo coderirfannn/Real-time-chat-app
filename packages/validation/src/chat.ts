@@ -85,6 +85,12 @@ export const messageReadSchema = z.object({
   messageIds: z.array(idSchema).optional(),
 });
 
+export const messageReactionSchema = z.object({
+  conversationId: idSchema,
+  messageId: idSchema,
+  emoji: z.string().min(1, 'Emoji is required').max(10, 'Emoji is too long'),
+});
+
 export type CreateDirectConversationInput = z.infer<typeof createDirectConversationSchema>;
 export type CreateConversationInput = z.infer<typeof createConversationSchema>;
 export type ConversationPaginationInput = z.infer<typeof conversationPaginationSchema>;
@@ -94,3 +100,4 @@ export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 export type TypingEventInput = z.infer<typeof typingEventSchema>;
 export type MessageDeliveredInput = z.infer<typeof messageDeliveredSchema>;
 export type MessageReadInput = z.infer<typeof messageReadSchema>;
+export type MessageReactionInput = z.infer<typeof messageReactionSchema>;

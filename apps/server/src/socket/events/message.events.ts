@@ -2,8 +2,11 @@ import {
   SocketEvents,
   type SendMessagePayload,
   type MessageAckResponse,
+  type MessageReactionPayload,
+  type MessageReactionEventPayload,
+  type MessageReaction,
 } from '@chatlock/shared-types';
-import { sendMessageSchema } from '@chatlock/validation';
+import { sendMessageSchema, messageReactionSchema } from '@chatlock/validation';
 import { messageService, type MessageService } from '../../services/message.service.js';
 import { roomManager } from '../rooms.js';
 import type { AuthenticatedSocket } from '../middleware/auth.socket.middleware.js';
@@ -67,14 +70,21 @@ export function registerMessageEvents(
         message: result.message,
       };
 
-      // 5. Broadcast to room if not a duplicate
+      // 5. Broadcast to conversation room AND each participant's user room if not a duplicate
       if (!result.isDuplicate) {
         const room = roomManager.getConversationRoom(validPayload.conversationId);
-        io.to(room).emit(SocketEvents.MESSAGE_NEW, result.message);
-        io.to(room).emit(SocketEvents.RECEIVE_MESSAGE, result.message);
+        let emitter = io.to(room);
+        if (result.participantIds && result.participantIds.length > 0) {
+          for (const pid of result.participantIds) {
+            emitter = emitter.to(roomManager.getUserRoom(pid));
+          }
+        }
+        emitter.emit(SocketEvents.MESSAGE_NEW, result.message);
+        emitter.emit(SocketEvents.RECEIVE_MESSAGE, result.message);
 
-        socketMsgLogger.debug('Message broadcasted to room', {
+        socketMsgLogger.debug('Message broadcasted to room and participants', {
           room,
+          participantIds: result.participantIds,
           messageId: result.message.id,
           senderId,
           clientMessageId: validPayload.clientMessageId,
@@ -115,8 +125,76 @@ export function registerMessageEvents(
     }
   };
 
+  const handleReaction = async (
+    rawPayload: MessageReactionPayload,
+    callback?: (res: { success: boolean; reactions?: MessageReaction[]; error?: string }) => void,
+  ) => {
+    try {
+      const userId = socket.data.user.id;
+      const parseResult = messageReactionSchema.safeParse(rawPayload);
+      if (!parseResult.success) {
+        const errorMsg =
+          parseResult.error.errors.map((e) => e.message).join(', ') || 'Invalid reaction payload';
+        if (callback) callback({ success: false, error: errorMsg });
+        socket.emit(SocketEvents.ERROR, {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: errorMsg,
+        });
+        return;
+      }
+
+      const { conversationId, messageId, emoji } = parseResult.data;
+      const result = await service.toggleReaction(userId, conversationId, messageId, emoji);
+
+      const eventPayload: MessageReactionEventPayload = {
+        conversationId,
+        messageId,
+        reactions: result.reactions,
+        userId,
+        emoji,
+        action: result.action,
+      };
+
+      // Broadcast reaction to conversation room and participants
+      const room = roomManager.getConversationRoom(conversationId);
+      let emitter = io.to(room);
+      if (result.participantIds && result.participantIds.length > 0) {
+        for (const pid of result.participantIds) {
+          emitter = emitter.to(roomManager.getUserRoom(pid));
+        }
+      }
+      emitter.emit(SocketEvents.MESSAGE_REACTION, eventPayload);
+
+      if (callback) {
+        callback({ success: true, reactions: result.reactions });
+      }
+    } catch (error) {
+      const isAppError = error instanceof AppError;
+      const errorCode = isAppError ? error.errorCode : ErrorCode.INTERNAL_SERVER_ERROR;
+      const errorMessage = (error as Error).message || 'Failed to toggle reaction';
+
+      socketMsgLogger.warn('Error processing reaction', {
+        socketId: socket.id,
+        userId: socket.data.user?.id,
+        errorCode,
+        errorMessage,
+      });
+
+      if (callback) {
+        callback({ success: false, error: errorMessage });
+      }
+      socket.emit(SocketEvents.ERROR, {
+        code: errorCode,
+        message: errorMessage,
+      });
+    }
+  };
+
   // Primary event: message:send
   socket.on(SocketEvents.MESSAGE_SEND, handleSendMessage);
+
+  // Reaction event: message:reaction
+  socket.on(SocketEvents.MESSAGE_REACTION, handleReaction);
 
   // Backward-compatible event: send_message
   socket.on(

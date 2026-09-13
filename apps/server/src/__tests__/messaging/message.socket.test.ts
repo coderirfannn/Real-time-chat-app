@@ -7,9 +7,11 @@ import { createApp } from '../../app.js';
 import { initSocketServer, closeSocketIO, connectionManager } from '../../socket/index.js';
 import { conversationRepository } from '../../repositories/conversation.repository.js';
 import { messageRepository } from '../../repositories/message.repository.js';
+import { messageReceiptRepository } from '../../repositories/message-receipt.repository.js';
 import { signAccessToken } from '../../utils/token.js';
 import { ErrorCode } from '../../errors/error-codes.js';
 import type { IMessageDoc } from '../../models/message.model.js';
+import type { IConversationDoc } from '../../models/conversation.model.js';
 
 describe('Real-Time Messaging Socket.IO End-to-End Tests', () => {
   let httpServer: HttpServer;
@@ -64,6 +66,11 @@ describe('Real-Time Messaging Socket.IO End-to-End Tests', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     connectionManager.clear();
+    vi.spyOn(conversationRepository, 'findById').mockResolvedValue({
+      _id: new Types.ObjectId(convId),
+      participants: [new Types.ObjectId(senderId), new Types.ObjectId(recipientId)],
+    } as unknown as IConversationDoc);
+    vi.spyOn(messageReceiptRepository, 'upsertReceipt').mockResolvedValue(null);
   });
 
   it('delivers real-time message to conversation room and ACKs sender', async () => {

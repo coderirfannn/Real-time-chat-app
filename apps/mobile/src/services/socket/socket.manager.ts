@@ -1,10 +1,15 @@
 import { socketService, type TypedClientSocket } from '../socket.service';
 import { useSocketStore } from '../../store/socket.store';
+import { apiClient } from '../api/client';
+import { useAuthStore } from '../../store/auth.store';
+import { secureStorage } from '../storage/secure-storage.service';
 import {
   type SendMessagePayload,
   type MessageAckResponse,
   type IMessage,
   type PresenceUpdatePayload,
+  type MessageReaction,
+  type MessageReactionEventPayload,
 } from '@chatlock/shared-types';
 
 export class SocketManager {
@@ -25,6 +30,21 @@ export class SocketManager {
    */
   public initialize(): void {
     if (this.initialized) return;
+
+    // Attach automatic token refresh recovery provider
+    socketService.setTokenRefreshProvider(async () => {
+      try {
+        const freshToken = await apiClient.handleTokenRefresh();
+        if (freshToken) {
+          const refreshToken = (await secureStorage.getItem('refresh_token')) || '';
+          await useAuthStore.getState().setTokens(freshToken, refreshToken);
+          return freshToken;
+        }
+      } catch (err) {
+        console.warn('[SocketManager] Automatic token refresh failed:', err);
+      }
+      return null;
+    });
 
     const socket: TypedClientSocket = socketService.getSocket();
 
@@ -213,6 +233,26 @@ export class SocketManager {
     }) => void,
   ): () => void {
     return socketService.onMessageRead(listener);
+  }
+
+  /**
+   * Toggles emoji reaction on a message via socket.
+   */
+  public async sendReaction(
+    conversationId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<{ success: boolean; reactions?: MessageReaction[]; error?: string }> {
+    return socketService.sendReaction(conversationId, messageId, emoji);
+  }
+
+  /**
+   * Registers callback for real-time reaction events.
+   */
+  public onMessageReaction(
+    listener: (payload: MessageReactionEventPayload) => void,
+  ): () => void {
+    return socketService.onMessageReaction(listener);
   }
 
   public isConnected(): boolean {

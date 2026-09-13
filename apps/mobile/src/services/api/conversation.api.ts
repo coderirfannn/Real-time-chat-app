@@ -34,6 +34,10 @@ export class ConversationApi {
       { params },
     );
   }
+
+  public async markAsRead(conversationId: string): Promise<{ markedCount: number }> {
+    return apiClient.post<{ markedCount: number }>(`/conversations/${conversationId}/read`, {});
+  }
 }
 
 export const conversationApi = new ConversationApi();

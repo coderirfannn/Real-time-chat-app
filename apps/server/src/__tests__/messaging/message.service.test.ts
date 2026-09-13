@@ -9,6 +9,7 @@ import { BadRequestError, ForbiddenError } from '../../errors/app-error.js';
 describe('MessageService Unit Tests', () => {
   let mockMessageRepo: Partial<MessageRepository>;
   let mockConvRepo: Partial<ConversationRepository>;
+  let mockReceiptRepo: { upsertReceipt: ReturnType<typeof vi.fn> };
   let service: MessageService;
 
   const senderId = new Types.ObjectId().toString();
@@ -23,6 +24,7 @@ describe('MessageService Unit Tests', () => {
     clientMessageId,
     content: 'Hello, World!',
     type: 'text',
+    reactions: [],
     createdAt: new Date(),
     toJSON: () => ({
       id: msgId,
@@ -31,6 +33,7 @@ describe('MessageService Unit Tests', () => {
       clientMessageId,
       content: 'Hello, World!',
       type: 'text',
+      reactions: [],
       createdAt: new Date().toISOString(),
     }),
   };
@@ -39,14 +42,20 @@ describe('MessageService Unit Tests', () => {
     mockMessageRepo = {
       findByClientMessageId: vi.fn(),
       createMessage: vi.fn(),
+      toggleReaction: vi.fn(),
     };
     mockConvRepo = {
       isParticipant: vi.fn(),
       updateLastMessage: vi.fn(),
+      findById: vi.fn(),
+    };
+    mockReceiptRepo = {
+      upsertReceipt: vi.fn().mockResolvedValue(null),
     };
     service = new MessageService(
       mockMessageRepo as MessageRepository,
       mockConvRepo as ConversationRepository,
+      mockReceiptRepo as unknown as any,
     );
   });
 
@@ -116,6 +125,36 @@ describe('MessageService Unit Tests', () => {
       ).rejects.toThrow(ForbiddenError);
     });
 
+    it('initializes sent receipts for all recipients in the conversation', async () => {
+      const recipientId = new Types.ObjectId().toString();
+      vi.mocked(mockConvRepo.isParticipant!).mockResolvedValue(true);
+      vi.mocked(mockConvRepo.findById!).mockResolvedValue({
+        _id: new Types.ObjectId(convId),
+        participants: [new Types.ObjectId(senderId), new Types.ObjectId(recipientId)],
+      } as any);
+      vi.mocked(mockMessageRepo.findByClientMessageId!).mockResolvedValue(null);
+      vi.mocked(mockMessageRepo.createMessage!).mockResolvedValue(
+        mockMessageDoc as unknown as IMessageDoc,
+      );
+      vi.mocked(mockConvRepo.updateLastMessage!).mockResolvedValue(null);
+
+      const result = await service.sendMessage(senderId, {
+        conversationId: convId,
+        clientMessageId,
+        content: 'Hello, World!',
+        type: 'text',
+      });
+
+      expect(result.participantIds).toContain(recipientId);
+      expect(result.participantIds).toContain(senderId);
+      expect(mockReceiptRepo.upsertReceipt).toHaveBeenCalledWith({
+        messageId: msgId,
+        conversationId: convId,
+        userId: recipientId,
+        status: 'sent',
+      });
+    });
+
     it('throws BadRequestError on malformed senderId or conversationId', async () => {
       await expect(
         service.sendMessage('invalid_id', {
@@ -134,6 +173,45 @@ describe('MessageService Unit Tests', () => {
           type: 'text',
         }),
       ).rejects.toThrow(BadRequestError);
+    });
+  });
+
+  describe('toggleReaction', () => {
+    it('successfully toggles reaction on a message for a participant', async () => {
+      vi.mocked(mockConvRepo.isParticipant!).mockResolvedValue(true);
+      vi.mocked(mockConvRepo.findById!).mockResolvedValue({
+        _id: new Types.ObjectId(convId),
+        participants: [new Types.ObjectId(senderId)],
+      } as any);
+
+      const updatedDoc = {
+        ...mockMessageDoc,
+        reactions: [{ emoji: '❤️', userId: senderId, createdAt: new Date().toISOString() }],
+        toJSON: () => ({
+          ...mockMessageDoc.toJSON(),
+          reactions: [{ emoji: '❤️', userId: senderId, createdAt: new Date().toISOString() }],
+        }),
+      };
+
+      vi.mocked(mockMessageRepo.toggleReaction!).mockResolvedValue({
+        message: updatedDoc as unknown as IMessageDoc,
+        action: 'added',
+      });
+
+      const res = await service.toggleReaction(senderId, convId, msgId, '❤️');
+
+      expect(res.action).toBe('added');
+      expect(res.reactions).toHaveLength(1);
+      expect(res.reactions[0]!.emoji).toBe('❤️');
+      expect(mockMessageRepo.toggleReaction).toHaveBeenCalledWith(msgId, senderId, '❤️');
+    });
+
+    it('throws ForbiddenError when non-participant attempts to react', async () => {
+      vi.mocked(mockConvRepo.isParticipant!).mockResolvedValue(false);
+
+      await expect(service.toggleReaction(senderId, convId, msgId, '❤️')).rejects.toThrow(
+        ForbiddenError,
+      );
     });
   });
 });

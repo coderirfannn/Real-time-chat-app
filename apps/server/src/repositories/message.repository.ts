@@ -156,6 +156,52 @@ export class MessageRepository extends BaseRepository<IMessageDoc> {
       editedAt: new Date(),
     });
   }
+
+  public async toggleReaction(
+    messageId: string | Types.ObjectId,
+    userId: string,
+    emoji: string,
+  ): Promise<{ message: IMessageDoc; action: 'added' | 'removed' } | null> {
+    if (!Types.ObjectId.isValid(messageId)) {
+      return null;
+    }
+
+    const doc = await this.model.findById(messageId).exec();
+    if (!doc) {
+      return null;
+    }
+
+    const reactions = doc.reactions || [];
+    const hasReaction = reactions.some((r) => r.userId === userId && r.emoji === emoji);
+
+    let updatedDoc: IMessageDoc | null;
+    let action: 'added' | 'removed';
+
+    if (hasReaction) {
+      updatedDoc = await this.model
+        .findByIdAndUpdate(
+          messageId,
+          { $pull: { reactions: { userId, emoji } } },
+          { new: true },
+        )
+        .populate('senderId', SENDER_FIELDS)
+        .exec();
+      action = 'removed';
+    } else {
+      updatedDoc = await this.model
+        .findByIdAndUpdate(
+          messageId,
+          { $push: { reactions: { userId, emoji, createdAt: new Date().toISOString() } } },
+          { new: true },
+        )
+        .populate('senderId', SENDER_FIELDS)
+        .exec();
+      action = 'added';
+    }
+
+    if (!updatedDoc) return null;
+    return { message: updatedDoc, action };
+  }
 }
 
 export const messageRepository = new MessageRepository();

@@ -15,6 +15,7 @@ export interface OutboxMessage {
   content: string;
   type?: MessageType;
   attachments?: MessageAttachment[];
+  replyToMessageId?: string;
   status: DeliveryStatus;
   deliveredAt?: string | null;
   readAt?: string | null;
@@ -28,6 +29,7 @@ export interface OutboxMessage {
     conversationId: string;
     content: string;
     clientMessageId: string;
+    replyToMessageId?: string;
   };
 }
 

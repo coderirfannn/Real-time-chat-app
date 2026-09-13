@@ -7,6 +7,8 @@ import {
   type MessageAckResponse,
   type IMessage,
   type PresenceUpdatePayload,
+  type MessageReaction,
+  type MessageReactionEventPayload,
 } from '@chatlock/shared-types';
 import { mobileConfig } from '../config/env';
 
@@ -16,9 +18,22 @@ export class SocketService {
   private socket: TypedClientSocket | null = null;
   private currentToken: string | null = null;
   private readonly baseUrl: string;
+  private tokenRefreshProvider: (() => Promise<string | null>) | null = null;
+  private isRefreshingToken = false;
 
   constructor(baseUrl?: string) {
     this.baseUrl = baseUrl || mobileConfig?.socketUrl || 'http://localhost:5000';
+  }
+
+  public setTokenRefreshProvider(provider: () => Promise<string | null>): void {
+    this.tokenRefreshProvider = provider;
+  }
+
+  public updateToken(token: string): void {
+    this.currentToken = token;
+    if (this.socket) {
+      this.socket.auth = { token };
+    }
   }
 
   /**
@@ -324,6 +339,43 @@ export class SocketService {
   }
 
   /**
+   * Emits message:reaction to toggle reaction on a message.
+   */
+  public async sendReaction(
+    conversationId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<{ success: boolean; reactions?: MessageReaction[]; error?: string }> {
+    const socket = this.getSocket();
+    if (!socket.connected) {
+      return { success: false, error: 'Socket is not connected' };
+    }
+
+    return new Promise((resolve) => {
+      socket.emit(
+        SocketEvents.MESSAGE_REACTION,
+        { conversationId, messageId, emoji },
+        (res: { success: boolean; reactions?: MessageReaction[]; error?: string }) => {
+          resolve(res || { success: true });
+        },
+      );
+    });
+  }
+
+  /**
+   * Registers callback for message:reaction events.
+   */
+  public onMessageReaction(
+    listener: (payload: MessageReactionEventPayload) => void,
+  ): () => void {
+    const socket = this.getSocket();
+    socket.on(SocketEvents.MESSAGE_REACTION, listener as never);
+    return () => {
+      socket.off(SocketEvents.MESSAGE_REACTION, listener as never);
+    };
+  }
+
+  /**
    * Checks if socket is currently connected.
    */
   public isConnected(): boolean {
@@ -344,8 +396,30 @@ export class SocketService {
       }
     });
 
-    socket.on('connect_error', (err) => {
+    socket.on('connect_error', async (err) => {
       console.warn('[ChatLock:Socket] Connection error:', err.message);
+      const isAuthError =
+        err.message.includes('jwt') ||
+        err.message.includes('auth') ||
+        err.message.includes('Unauthorized') ||
+        err.message.includes('token');
+
+      if (isAuthError && this.tokenRefreshProvider && !this.isRefreshingToken) {
+        this.isRefreshingToken = true;
+        try {
+          console.info('[ChatLock:Socket] Auth error on handshake. Requesting fresh token...');
+          const freshToken = await this.tokenRefreshProvider();
+          if (freshToken) {
+            this.updateToken(freshToken);
+            console.info('[ChatLock:Socket] Token refreshed. Reconnecting socket gateway...');
+            socket.connect();
+          }
+        } catch (refreshErr) {
+          console.error('[ChatLock:Socket] Automatic token refresh failed on reconnect:', refreshErr);
+        } finally {
+          this.isRefreshingToken = false;
+        }
+      }
     });
 
     socket.on(SocketEvents.ERROR, (error) => {

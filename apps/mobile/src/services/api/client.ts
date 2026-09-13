@@ -44,6 +44,8 @@ export class ApiClient {
   private readonly defaultTimeout: number;
   private isRefreshing = false;
   private refreshSubscribers: Array<(token: string | null) => void> = [];
+  private tokenUpdateHandler: ((accessToken: string, refreshToken: string) => void) | null = null;
+  private authFailureHandler: (() => void) | null = null;
 
   constructor(
     baseUrl: string = mobileConfig?.apiUrl || 'http://localhost:5000/api/v1',
@@ -51,6 +53,14 @@ export class ApiClient {
   ) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.defaultTimeout = defaultTimeout;
+  }
+
+  public setTokenUpdateHandler(handler: (accessToken: string, refreshToken: string) => void): void {
+    this.tokenUpdateHandler = handler;
+  }
+
+  public setAuthFailureHandler(handler: () => void): void {
+    this.authFailureHandler = handler;
   }
 
   public async get<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
@@ -117,7 +127,10 @@ export class ApiClient {
       clearTimeout(timeoutId);
 
       // Handle 401 Unauthorized with token refresh mutex
-      if (response.status === 401 && !skipAuth && !isRetry && !endpoint.includes('/auth/')) {
+      const isAuthExchange = ['/auth/login', '/auth/register', '/auth/refresh'].some(
+        (path) => endpoint === path || endpoint.endsWith(path),
+      );
+      if (response.status === 401 && !skipAuth && !isRetry && !isAuthExchange) {
         const newAccessToken = await this.handleTokenRefresh();
         if (newAccessToken) {
           return this.request<T>(endpoint, {
@@ -188,7 +201,7 @@ export class ApiClient {
     }
   }
 
-  private async handleTokenRefresh(): Promise<string | null> {
+  public async handleTokenRefresh(): Promise<string | null> {
     if (this.isRefreshing) {
       return new Promise((resolve) => {
         this.refreshSubscribers.push((token) => resolve(token));
@@ -213,6 +226,8 @@ export class ApiClient {
       if (!res.ok) {
         await secureStorage.removeItem('access_token');
         await secureStorage.removeItem('refresh_token');
+        await secureStorage.removeItem('user_data');
+        this.authFailureHandler?.();
         this.notifyRefreshSubscribers(null);
         return null;
       }
@@ -232,6 +247,7 @@ export class ApiClient {
       if (tokens?.accessToken && tokens?.refreshToken) {
         await secureStorage.setItem('access_token', tokens.accessToken);
         await secureStorage.setItem('refresh_token', tokens.refreshToken);
+        this.tokenUpdateHandler?.(tokens.accessToken, tokens.refreshToken);
         this.notifyRefreshSubscribers(tokens.accessToken);
         return tokens.accessToken;
       }
@@ -239,6 +255,7 @@ export class ApiClient {
       this.notifyRefreshSubscribers(null);
       return null;
     } catch {
+      this.authFailureHandler?.();
       this.notifyRefreshSubscribers(null);
       return null;
     } finally {

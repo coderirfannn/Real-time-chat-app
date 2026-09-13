@@ -4,6 +4,9 @@ import { Avatar } from '../../components/Avatar';
 import { Badge } from '../../components/Badge';
 import { DateSeparator } from '../../components/DateSeparator';
 import { MessageBubble } from '../../features/chat/components/MessageBubble';
+import { DeliveryReceipt } from '../../features/chat/components/DeliveryReceipt';
+import { ReactionPicker, QUICK_EMOJIS } from '../../features/chat/components/ReactionPicker';
+import { MessageComposer } from '../../features/chat/components/MessageComposer';
 import type { LocalMessage } from '../../types/chat.types';
 
 describe('Chat UI Components Unit Tests', () => {
@@ -51,5 +54,99 @@ describe('Chat UI Components Unit Tests', () => {
     expect(element).toBeDefined();
     expect(element.props.isOutbound).toBe(true);
     expect(element.props.message.status).toBe('failed');
+  });
+
+  it('renders DeliveryReceipt for each status lifecycle', () => {
+    const statuses = ['pending', 'sending', 'sent', 'delivered', 'read', 'failed'] as const;
+    for (const status of statuses) {
+      const receipt = React.createElement(DeliveryReceipt, { status, onRetry: vi.fn() });
+      expect(receipt).toBeDefined();
+      expect(receipt.props.status).toBe(status);
+    }
+  });
+
+  it('instantiates ReactionPicker with quick emojis and action callbacks', () => {
+    const onSelectEmoji = vi.fn();
+    const onReply = vi.fn();
+    const onCopy = vi.fn();
+
+    const picker = React.createElement(ReactionPicker, {
+      onSelectEmoji,
+      onReply,
+      onCopy,
+      isOutbound: true,
+    });
+
+    expect(picker).toBeDefined();
+    expect(QUICK_EMOJIS.length).toBeGreaterThan(0);
+    expect(picker.props.isOutbound).toBe(true);
+  });
+
+  it('renders MessageBubble with reply preview snippet and reactions', () => {
+    const parentMessage: LocalMessage = {
+      id: 'parent-1',
+      conversationId: 'conv-1',
+      senderId: 'peer-1',
+      clientMessageId: 'cp1',
+      type: 'text',
+      content: 'Original question?',
+      status: 'read',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const replyMessage: LocalMessage = {
+      id: 'msg-2',
+      conversationId: 'conv-1',
+      senderId: 'user-1',
+      clientMessageId: 'c2',
+      type: 'text',
+      content: 'Here is my answer!',
+      status: 'delivered',
+      replyToMessageId: 'parent-1',
+      reactions: [{ emoji: '🔥', userId: 'user-1', createdAt: new Date().toISOString() }],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const bubble = React.createElement(MessageBubble, {
+      message: replyMessage,
+      isOutbound: true,
+      parentMessage,
+      currentUserId: 'user-1',
+      onReaction: vi.fn(),
+      onReply: vi.fn(),
+    });
+
+    expect(bubble).toBeDefined();
+    expect(bubble.props.parentMessage?.id).toBe('parent-1');
+    expect(bubble.props.message.reactions?.[0]?.emoji).toBe('🔥');
+  });
+
+  it('instantiates MessageComposer with replyingTo banner support', () => {
+    const replyingTo: LocalMessage = {
+      id: 'msg-quote',
+      conversationId: 'conv-1',
+      senderId: 'peer-1',
+      clientMessageId: 'cq',
+      type: 'text',
+      content: 'Quote me!',
+      status: 'read',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const onSendMessage = vi.fn();
+    const onCancelReply = vi.fn();
+
+    const composer = React.createElement(MessageComposer, {
+      conversationId: 'conv-1',
+      onSendMessage,
+      replyingTo,
+      onCancelReply,
+    });
+
+    expect(composer).toBeDefined();
+    expect(composer.props.replyingTo?.content).toBe('Quote me!');
   });
 });

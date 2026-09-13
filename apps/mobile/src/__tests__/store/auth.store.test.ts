@@ -107,4 +107,58 @@ describe('useAuthStore Unit Tests', () => {
     expect(state.accessToken).toBe('stored-access-token');
     expect(state.user?.username).toBe('testuser');
   });
+
+  it('proactively refreshes an expired access token during hydration', async () => {
+    const mockUser: UserProfile = {
+      id: 'user-123',
+      email: 'user@example.com',
+      username: 'testuser',
+      displayName: 'Test User',
+      status: 'online',
+    };
+
+    // Create an expired JWT token (expired 1 hour ago)
+    const expiredPayload = Buffer.from(
+      JSON.stringify({ exp: Math.floor(Date.now() / 1000) - 3600, sub: 'user-123' }),
+    ).toString('base64');
+    const expiredJwt = `eyJhbGciOiJIUzI1NiJ9.${expiredPayload}.signature`;
+
+    await secureStorage.setItem('access_token', expiredJwt);
+    await secureStorage.setItem('refresh_token', 'valid-refresh-token');
+    await secureStorage.setItem('user_data', JSON.stringify(mockUser));
+
+    global.fetch = (url) => {
+      if (String(url).includes('/auth/refresh')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () =>
+            Promise.resolve(
+              JSON.stringify({
+                success: true,
+                data: {
+                  tokens: {
+                    accessToken: 'proactively-rotated-jwt',
+                    refreshToken: 'new-persisted-refresh',
+                  },
+                },
+              }),
+            ),
+        } as unknown as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify({ success: true, data: mockUser })),
+      } as unknown as Response);
+    };
+
+    await useAuthStore.getState().hydrateAuth();
+
+    const state = useAuthStore.getState();
+    expect(state.isAuthenticated).toBe(true);
+    expect(state.accessToken).toBe('proactively-rotated-jwt');
+    expect(await secureStorage.getItem('access_token')).toBe('proactively-rotated-jwt');
+    expect(await secureStorage.getItem('refresh_token')).toBe('new-persisted-refresh');
+  });
 });

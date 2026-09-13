@@ -19,7 +19,7 @@ export function createSecurityMiddlewares(): RequestHandler[] {
   const corsOrigins = config.app.corsOrigins;
   middlewares.push(
     cors({
-      origin: corsOrigins.includes('*') ? '*' : corsOrigins,
+      origin: corsOrigins.includes('*') ? true : corsOrigins,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-request-id'],

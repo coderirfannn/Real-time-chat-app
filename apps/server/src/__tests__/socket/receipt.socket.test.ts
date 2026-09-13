@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { registerReceiptEvents } from '../../socket/events/receipt.events.js';
 import { roomManager } from '../../socket/rooms.js';
+import { conversationRepository } from '../../repositories/conversation.repository.js';
 import { SocketEvents, type ReceiptUpdatePayload } from '@chatlock/shared-types';
 import type { AuthenticatedSocket } from '../../socket/middleware/auth.socket.middleware.js';
 import type { TypedSocketServer } from '../../socket/index.js';
@@ -18,6 +19,7 @@ describe('Real-Time Receipts Socket.IO Tests — Task 13 Verification', () => {
     to: ReturnType<typeof vi.fn>;
   };
   let mockToRoom: {
+    to: ReturnType<typeof vi.fn>;
     emit: ReturnType<typeof vi.fn>;
   };
   let mockReceiptService: ReceiptService;
@@ -30,12 +32,19 @@ describe('Real-Time Receipts Socket.IO Tests — Task 13 Verification', () => {
     vi.restoreAllMocks();
 
     mockToRoom = {
+      to: vi.fn(),
       emit: vi.fn(),
     };
+    mockToRoom.to.mockReturnValue(mockToRoom);
 
     mockIo = {
       to: vi.fn().mockReturnValue(mockToRoom),
     };
+
+    vi.spyOn(conversationRepository, 'findById').mockResolvedValue({
+      _id: validConvId,
+      participants: [validUserId, '6a955a298f74016374325513'],
+    } as any);
 
     const listeners = new Map<
       string,

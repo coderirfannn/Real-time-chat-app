@@ -73,4 +73,17 @@ describe('Mobile SocketService Unit Tests', () => {
     expect(unsubscribe).toBeInstanceOf(Function);
     unsubscribe();
   });
+
+  it('returns failure when sendReaction called while disconnected', async () => {
+    const res = await service.sendReaction('507f1f77bcf86cd799439011', 'msg_123', '❤️');
+    expect(res.success).toBe(false);
+    expect(res.error).toBe('Socket is not connected');
+  });
+
+  it('registers and unregisters onMessageReaction listeners', () => {
+    const listener = vi.fn();
+    const unsubscribe = service.onMessageReaction(listener);
+    expect(unsubscribe).toBeInstanceOf(Function);
+    unsubscribe();
+  });
 });

@@ -7,17 +7,19 @@ import { outboxSyncManager } from '../../../services/outbox/outbox-sync.manager'
 import { useSocketStore } from '../../../store/socket.store';
 import { useAppStore } from '../../../store/app.store';
 import { useAuthStore } from '../../../store/auth.store';
+import { useNotificationStore } from '../../../store/notification.store';
 import { buildInvertedChatFeed } from '../../../utils/message-grouper';
 import { reconcileChatMessages } from '../../../utils/message-reconciler';
+import { CONVERSATIONS_QUERY_KEY } from './useConversations';
 import type { LocalMessage, OutboxMessage, ChatFeedItem } from '../../../types/chat.types';
 import type {
   IMessage,
   MessageAckResponse,
   UserProfile,
-  IConversation,
   PresenceUpdatePayload,
   MessageAttachment,
   MessageType,
+  MessageReaction,
 } from '@chatlock/shared-types';
 
 export interface UseChatReturn {
@@ -30,13 +32,18 @@ export interface UseChatReturn {
   isRefreshing: boolean;
   isPeerTyping: boolean;
   error: Error | null;
-  sendMessage: (content: string, attachments?: MessageAttachment[]) => Promise<void>;
+  sendMessage: (content: string, attachments?: MessageAttachment[], replyToMessageId?: string) => Promise<void>;
   retryMessage: (clientMessageId: string) => Promise<void>;
   startTyping: () => void;
   stopTyping: () => void;
   loadMoreMessages: () => void;
   refetchHistory: () => Promise<unknown>;
   refresh: () => Promise<void>;
+  replyingTo: LocalMessage | null;
+  setReplyingTo: (message: LocalMessage | null) => void;
+  toggleReaction: (messageId: string, emoji: string) => void;
+  parentMessagesMap: Record<string, LocalMessage>;
+  currentUserId: string;
 }
 
 function generateClientMessageId(): string {
@@ -56,8 +63,10 @@ export function useChat(conversationId: string): UseChatReturn {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPeerTyping, setIsPeerTyping] = useState(false);
   const [peerPresence, setPeerPresence] = useState<{ status?: string; lastSeenAt?: string }>({});
+  const [replyingTo, setReplyingTo] = useState<LocalMessage | null>(null);
 
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const allMessagesRef = useRef<LocalMessage[]>([]);
 
   // 1. Fetch conversation details (participants & recipient)
   const { data: convData, isLoading: isLoadingConv } = useQuery({
@@ -138,16 +147,58 @@ export function useChat(conversationId: string): UseChatReturn {
     };
   }, [convData, currentUserId, peerPresence]);
 
-  // 4. Socket Room Lifecycle: Join on mount, leave on unmount
+  // 4. Socket Room Lifecycle: Join on mount, leave on unmount & track active conversation
   useEffect(() => {
     if (!conversationId) return;
 
     socketManager.joinConversation(conversationId).catch(() => {});
+    useNotificationStore.getState().setActiveConversationId(conversationId);
+
+    // Mark conversation as read both via REST API and Socket.IO
+    conversationApi.markAsRead(conversationId).catch(() => {});
+    socketManager.sendReadReceipt(conversationId);
+
+    // Instantly zero out unread counter for this conversation in query cache
+    queryClient.setQueryData(CONVERSATIONS_QUERY_KEY, (oldData: unknown) => {
+      if (!oldData) return oldData;
+      const list = Array.isArray(oldData)
+        ? oldData
+        : (oldData as { docs?: Record<string, unknown>[] }).docs || [];
+
+      const updated = list.map((item) => {
+        const itemId = item['id'] || item['_id'];
+        if (itemId === conversationId) {
+          return { ...item, unreadCount: 0 };
+        }
+        return item;
+      });
+
+      return Array.isArray(oldData) ? updated : { ...(oldData as object), docs: updated };
+    });
 
     return () => {
       socketManager.leaveConversation(conversationId).catch(() => {});
+      useNotificationStore.getState().setActiveConversationId(null);
+
+      // Ensure unread count remains 0 upon leaving the read conversation
+      queryClient.setQueryData(CONVERSATIONS_QUERY_KEY, (oldData: unknown) => {
+        if (!oldData) return oldData;
+        const list = Array.isArray(oldData)
+          ? oldData
+          : (oldData as { docs?: Record<string, unknown>[] }).docs || [];
+
+        const updated = list.map((item) => {
+          const itemId = item['id'] || item['_id'];
+          if (itemId === conversationId) {
+            return { ...item, unreadCount: 0 };
+          }
+          return item;
+        });
+
+        return Array.isArray(oldData) ? updated : { ...(oldData as object), docs: updated };
+      });
     };
-  }, [conversationId]);
+  }, [conversationId, queryClient]);
 
   // 5. Reconnection Gap Synchronization: automatically refetch history and drain outbox on connect
   useEffect(() => {
@@ -229,7 +280,14 @@ export function useChat(conversationId: string): UseChatReturn {
     const unsubNew = socketManager.onNewMessage((newMsg: IMessage) => {
       if (newMsg.conversationId !== conversationId) return;
 
-      const isIncoming = newMsg.senderId !== currentUserId;
+      const senderIdStr =
+        typeof newMsg.senderId === 'string'
+          ? newMsg.senderId
+          : (newMsg.senderId as { id?: string; _id?: string })?.id ||
+            (newMsg.senderId as { id?: string; _id?: string })?._id ||
+            String(newMsg.senderId || '');
+
+      const isIncoming = Boolean(currentUserId && senderIdStr && senderIdStr !== currentUserId);
       const formattedMsg: LocalMessage = {
         ...newMsg,
         clientMessageId: newMsg.clientMessageId || `srv_${newMsg.id}`,
@@ -268,18 +326,21 @@ export function useChat(conversationId: string): UseChatReturn {
       }
 
       // Update global conversations query cache
-      queryClient.setQueryData(['conversations'], (oldData: unknown) => {
+      queryClient.setQueryData(CONVERSATIONS_QUERY_KEY, (oldData: unknown) => {
         if (!oldData) return oldData;
         const list = Array.isArray(oldData)
           ? oldData
-          : (oldData as { docs?: IConversation[] }).docs || [];
+          : (oldData as { docs?: Record<string, unknown>[] }).docs || [];
 
-        const updated = list.map((c: IConversation) => {
-          if (c.id === conversationId) {
+        const updated = list.map((c) => {
+          const cId = c['id'] || c['_id'];
+          if (cId === conversationId) {
             return {
               ...c,
               lastMessage: newMsg,
+              lastMessageId: newMsg,
               lastMessageAt: newMsg.createdAt,
+              unreadCount: 0,
             };
           }
           return c;
@@ -340,17 +401,37 @@ export function useChat(conversationId: string): UseChatReturn {
       );
     });
 
+    const unsubReaction = socketManager.onMessageReaction((payload) => {
+      if (payload.conversationId !== conversationId) return;
+
+      setSocketMessages((prev) => {
+        const match = prev.find((m) => m.id === payload.messageId);
+        if (match) {
+          return prev.map((m) =>
+            m.id === payload.messageId ? { ...m, reactions: payload.reactions } : m,
+          );
+        } else {
+          const historyMsg = allMessagesRef.current.find((m) => m.id === payload.messageId);
+          if (historyMsg) {
+            return [...prev, { ...historyMsg, reactions: payload.reactions }];
+          }
+          return prev;
+        }
+      });
+    });
+
     return () => {
       unsubNew();
       unsubSent();
       unsubDelivered();
       unsubRead();
+      unsubReaction();
     };
   }, [conversationId, queryClient, currentUserId]);
 
   // 9. Send message with offline-first durable outbox queue
   const sendMessage = useCallback(
-    async (content: string, attachments?: MessageAttachment[]) => {
+    async (content: string, attachments?: MessageAttachment[], replyToMessageId?: string) => {
       const hasContent = content.trim().length > 0;
       const hasAttachments = Boolean(attachments && attachments.length > 0);
 
@@ -371,6 +452,8 @@ export function useChat(conversationId: string): UseChatReturn {
         else msgType = 'file';
       }
 
+      const targetReplyId = replyToMessageId || replyingTo?.id;
+
       const outboxItem: OutboxMessage = {
         conversationId,
         senderId: currentUserId,
@@ -379,6 +462,7 @@ export function useChat(conversationId: string): UseChatReturn {
         type: msgType,
         content: content.trim(),
         attachments: hasAttachments ? attachments : undefined,
+        replyToMessageId: targetReplyId,
         status: isConnected ? 'sending' : 'pending',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -387,8 +471,11 @@ export function useChat(conversationId: string): UseChatReturn {
           conversationId,
           content: content.trim(),
           clientMessageId,
+          replyToMessageId: targetReplyId,
         },
       };
+
+      setReplyingTo(null);
 
       // 1. Save to durable persistent storage immediately
       await outboxService.enqueue(outboxItem);
@@ -403,7 +490,7 @@ export function useChat(conversationId: string): UseChatReturn {
         }
       }
     },
-    [conversationId, currentUser, currentUserId, isNetworkOnline],
+    [conversationId, currentUser, currentUserId, isNetworkOnline, replyingTo],
   );
 
   const startTyping = useCallback(() => {
@@ -452,10 +539,77 @@ export function useChat(conversationId: string): UseChatReturn {
     });
   }, [infiniteHistory?.pages, socketMessages, outboxMessages]);
 
+  allMessagesRef.current = allMessages;
+
   // 14. Build inverted feed items
   const feedItems = useMemo(
     () => buildInvertedChatFeed(allMessages, currentUserId),
     [allMessages, currentUserId],
+  );
+
+  // 15. Map of message ID to message for O(1) reply previews
+  const parentMessagesMap = useMemo(() => {
+    const map: Record<string, LocalMessage> = {};
+    for (const msg of allMessages) {
+      if (msg.id) {
+        map[msg.id] = msg;
+      }
+    }
+    return map;
+  }, [allMessages]);
+
+  // 16. Optimistic Reaction toggle
+  const toggleReaction = useCallback(
+    (messageId: string, emoji: string) => {
+      if (!currentUserId || !messageId) return;
+
+      setSocketMessages((prev) => {
+        const found = prev.find((m) => m.id === messageId);
+        if (found) {
+          const currentReactions = found.reactions || [];
+          const idx = currentReactions.findIndex(
+            (r) => r.userId === currentUserId && r.emoji === emoji,
+          );
+          let nextReactions: MessageReaction[];
+          if (idx >= 0) {
+            nextReactions = currentReactions.filter((_, i) => i !== idx);
+          } else {
+            nextReactions = [
+              ...currentReactions,
+              { emoji, userId: currentUserId, createdAt: new Date().toISOString() },
+            ];
+          }
+          return prev.map((m) => (m.id === messageId ? { ...m, reactions: nextReactions } : m));
+        } else {
+          const historyMsg = allMessagesRef.current.find((m) => m.id === messageId);
+          if (historyMsg) {
+            const currentReactions = historyMsg.reactions || [];
+            const idx = currentReactions.findIndex(
+              (r) => r.userId === currentUserId && r.emoji === emoji,
+            );
+            let nextReactions: MessageReaction[];
+            if (idx >= 0) {
+              nextReactions = currentReactions.filter((_, i) => i !== idx);
+            } else {
+              nextReactions = [
+                ...currentReactions,
+                { emoji, userId: currentUserId, createdAt: new Date().toISOString() },
+              ];
+            }
+            return [...prev, { ...historyMsg, reactions: nextReactions }];
+          }
+          return prev;
+        }
+      });
+
+      // Emit real-time reaction to server & peer
+      if (conversationId) {
+        socketManager.sendReaction(conversationId, messageId, emoji).catch((err) => {
+          console.warn('[useChat] Failed to dispatch reaction:', err);
+        });
+      }
+    },
+    [currentUserId, conversationId],
   );
 
   return {
@@ -475,5 +629,10 @@ export function useChat(conversationId: string): UseChatReturn {
     loadMoreMessages,
     refetchHistory,
     refresh,
+    replyingTo,
+    setReplyingTo,
+    toggleReaction,
+    parentMessagesMap,
+    currentUserId,
   };
 }

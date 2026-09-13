@@ -3,11 +3,21 @@ import { View, Text, StyleSheet } from 'react-native';
 
 export interface DateSeparatorProps {
   label: string;
+  accessibilityRole?: 'header' | 'text' | 'none';
+  accessibilityLabel?: string;
 }
 
-export function DateSeparator({ label }: DateSeparatorProps): React.JSX.Element {
+export function DateSeparator({
+  label,
+  accessibilityRole = 'header',
+  accessibilityLabel,
+}: DateSeparatorProps): React.JSX.Element {
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      accessibilityRole={accessibilityRole}
+      accessibilityLabel={accessibilityLabel || `Conversation date: ${label}`}
+    >
       <View style={styles.pill}>
         <Text style={styles.text}>{label}</Text>
       </View>
@@ -18,21 +28,22 @@ export function DateSeparator({ label }: DateSeparatorProps): React.JSX.Element 
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    marginVertical: 12,
+    marginVertical: 14,
   },
   pill: {
-    backgroundColor: '#1E293B',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    backgroundColor: '#1F222A',
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 9999,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#2A2D36',
   },
   text: {
-    color: '#94A3B8',
+    color: '#A0A5B5',
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
 });
+

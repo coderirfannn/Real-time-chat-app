@@ -1,5 +1,5 @@
 import type { ID } from './common.js';
-import type { IMessage, MessageType, MessageAttachment } from './chat.js';
+import type { IMessage, MessageType, MessageAttachment, MessageReaction } from './chat.js';
 import type { UserStatus } from './user.js';
 import type { ReceiptStatus } from './receipt.js';
 
@@ -14,6 +14,7 @@ export enum SocketEvents {
   MESSAGE_NEW = 'message:new',
   MESSAGE_DELIVERED = 'message:delivered',
   MESSAGE_READ = 'message:read',
+  MESSAGE_REACTION = 'message:reaction',
   SEND_MESSAGE = 'send_message',
   RECEIVE_MESSAGE = 'receive_message',
   MESSAGE_DELIVERED_LEGACY = 'message_delivered',
@@ -91,6 +92,21 @@ export interface ReceiptUpdatePayload {
   timestamp: string;
 }
 
+export interface MessageReactionPayload {
+  conversationId: ID;
+  messageId: ID;
+  emoji: string;
+}
+
+export interface MessageReactionEventPayload {
+  conversationId: ID;
+  messageId: ID;
+  reactions: MessageReaction[];
+  userId: ID;
+  emoji: string;
+  action: 'added' | 'removed';
+}
+
 export interface ClientToServerEvents {
   [SocketEvents.AUTHENTICATE]: (
     token: string,
@@ -107,6 +123,10 @@ export interface ClientToServerEvents {
   [SocketEvents.MESSAGE_SEND]: (
     payload: SendMessagePayload,
     callback?: (res: MessageAckResponse) => void,
+  ) => void;
+  [SocketEvents.MESSAGE_REACTION]: (
+    payload: MessageReactionPayload,
+    callback?: (res: { success: boolean; reactions?: MessageReaction[]; error?: string }) => void,
   ) => void;
   [SocketEvents.SEND_MESSAGE]: (
     payload: SendMessagePayload | { conversationId: ID; content: string; tempId?: string },
@@ -140,6 +160,7 @@ export interface ClientToServerEvents {
 export interface ServerToClientEvents {
   [SocketEvents.MESSAGE_NEW]: (message: IMessage) => void;
   [SocketEvents.MESSAGE_SENT]: (ack: MessageAckResponse) => void;
+  [SocketEvents.MESSAGE_REACTION]: (payload: MessageReactionEventPayload) => void;
   [SocketEvents.RECEIVE_MESSAGE]: (message: IMessage) => void;
   [SocketEvents.MESSAGE_DELIVERED]: (payload: ReceiptUpdatePayload) => void;
   [SocketEvents.MESSAGE_READ]: (payload: ReceiptUpdatePayload) => void;

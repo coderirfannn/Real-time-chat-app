@@ -1,34 +1,27 @@
 import React, { useMemo } from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
+import { avatarPalette } from '../theme/colors';
 
-export type AvatarSize = 'sm' | 'md' | 'lg';
+export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 export interface AvatarProps {
   name: string;
   avatarUrl?: string;
   size?: AvatarSize;
   isOnline?: boolean;
+  hasRing?: boolean;
+  accessibilityRole?: 'image' | 'button' | 'none';
+  accessibilityLabel?: string;
 }
 
-const AVATAR_COLORS = [
-  '#0284C7', // Sky
-  '#0D9488', // Teal
-  '#16A34A', // Green
-  '#D97706', // Amber
-  '#DC2626', // Red
-  '#7C3AED', // Violet
-  '#DB2777', // Pink
-  '#4F46E5', // Indigo
-];
-
 function getAvatarColor(name: string): string {
-  if (!name) return AVATAR_COLORS[0] ?? '#0284C7';
+  if (!name) return avatarPalette[0];
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  const index = Math.abs(hash) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[index] ?? '#0284C7';
+  const index = Math.abs(hash) % avatarPalette.length;
+  return avatarPalette[index] ?? avatarPalette[0];
 }
 
 function getInitials(name: string): string {
@@ -42,22 +35,65 @@ function getInitials(name: string): string {
   return ((first[0] ?? '') + (last[0] ?? '')).toUpperCase() || '?';
 }
 
+export function getAvatarAccessibilityLabel(name: string, isOnline?: boolean): string {
+  return `${name || 'User'} avatar${isOnline ? ', online' : ''}`;
+}
+
 export function Avatar({
+
   name,
   avatarUrl,
   size = 'md',
   isOnline = false,
+  hasRing = false,
+  accessibilityRole = 'image',
+  accessibilityLabel,
 }: AvatarProps): React.JSX.Element {
   const initials = useMemo(() => getInitials(name), [name]);
   const backgroundColor = useMemo(() => getAvatarColor(name), [name]);
 
-  const sizeStyle = size === 'sm' ? styles.sizeSm : size === 'lg' ? styles.sizeLg : styles.sizeMd;
+
+  const sizeStyle =
+    size === 'xs'
+      ? styles.sizeXs
+      : size === 'sm'
+        ? styles.sizeSm
+        : size === 'lg'
+          ? styles.sizeLg
+          : size === 'xl'
+            ? styles.sizeXl
+            : styles.sizeMd;
+
   const textSizeStyle =
-    size === 'sm' ? styles.textSm : size === 'lg' ? styles.textLg : styles.textMd;
-  const dotSizeStyle = size === 'sm' ? styles.dotSm : size === 'lg' ? styles.dotLg : styles.dotMd;
+    size === 'xs'
+      ? styles.textXs
+      : size === 'sm'
+        ? styles.textSm
+        : size === 'lg'
+          ? styles.textLg
+          : size === 'xl'
+            ? styles.textXl
+            : styles.textMd;
+
+  const dotSizeStyle =
+    size === 'xs'
+      ? styles.dotXs
+      : size === 'sm'
+        ? styles.dotSm
+        : size === 'lg'
+          ? styles.dotLg
+          : size === 'xl'
+            ? styles.dotXl
+            : styles.dotMd;
 
   return (
-    <View style={[styles.wrapper, sizeStyle]}>
+    <View
+      style={[styles.wrapper, sizeStyle, hasRing ? styles.ringWrapper : null]}
+      accessibilityRole={accessibilityRole}
+      accessibilityLabel={
+        accessibilityLabel || getAvatarAccessibilityLabel(name, isOnline)
+      }
+    >
       {avatarUrl ? (
         <Image source={{ uri: avatarUrl }} style={[styles.image, sizeStyle]} />
       ) : (
@@ -76,58 +112,91 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  ringWrapper: {
+    borderWidth: 2,
+    borderColor: '#246BFD',
+    borderRadius: 9999,
+    padding: 2,
+  },
   fallback: {
-    borderRadius: 999,
+    borderRadius: 9999,
     justifyContent: 'center',
     alignItems: 'center',
   },
   image: {
-    borderRadius: 999,
+    borderRadius: 9999,
   },
   initials: {
     color: '#FFFFFF',
     fontWeight: '700',
   },
+  sizeXs: {
+    width: 26,
+    height: 26,
+  },
   sizeSm: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
   },
   sizeMd: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
   },
   sizeLg: {
-    width: 56,
-    height: 56,
+    width: 58,
+    height: 58,
+  },
+  sizeXl: {
+    width: 72,
+    height: 72,
+  },
+  textXs: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   textSm: {
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: '700',
   },
   textMd: {
-    fontSize: 16,
+    fontSize: 17,
+    fontWeight: '700',
   },
   textLg: {
     fontSize: 22,
+    fontWeight: '700',
+  },
+  textXl: {
+    fontSize: 28,
+    fontWeight: '700',
   },
   onlineDot: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#22C55E',
+    backgroundColor: '#12D18E',
     borderWidth: 2,
-    borderColor: '#0F172A',
-    borderRadius: 999,
+    borderColor: '#181A20',
+    borderRadius: 9999,
+  },
+  dotXs: {
+    width: 8,
+    height: 8,
   },
   dotSm: {
     width: 10,
     height: 10,
   },
   dotMd: {
-    width: 12,
-    height: 12,
+    width: 13,
+    height: 13,
   },
   dotLg: {
-    width: 14,
-    height: 14,
+    width: 15,
+    height: 15,
+  },
+  dotXl: {
+    width: 18,
+    height: 18,
   },
 });

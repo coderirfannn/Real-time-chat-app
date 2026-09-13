@@ -2,10 +2,8 @@ import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -14,6 +12,8 @@ import {
 import { useRouter } from 'expo-router';
 import { authApi } from '../../src/services/api/auth.api';
 import { useAuthStore } from '../../src/store/auth.store';
+import { Input, Button, Card, Icon } from '../../src/components/ui';
+import { brandColors, semanticColors } from '../../src/theme/colors';
 
 export default function LoginScreen(): React.JSX.Element {
   const router = useRouter();
@@ -70,32 +70,31 @@ export default function LoginScreen(): React.JSX.Element {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Header Brand */}
-          <View style={styles.brandContainer}>
-            <View style={styles.logoBadge}>
-              <Text style={styles.logoText}>🔒</Text>
-            </View>
-            <Text style={styles.title}>ChatLock</Text>
-            <Text style={styles.subtitle}>Real-time secure messaging</Text>
-          </View>
-
-          {/* Form Card */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Sign In</Text>
-
-            {errorMessage && (
-              <View style={styles.errorBanner}>
-                <Text style={styles.errorText}>⚠️ {errorMessage}</Text>
+          <View style={styles.contentWrapper}>
+            {/* Header Brand */}
+            <View style={styles.brandContainer}>
+              <View style={styles.logoBadge}>
+                <Icon name="shield" size={32} color="#FFFFFF" />
               </View>
-            )}
+              <Text style={styles.title}>ChatLock</Text>
+              <Text style={styles.subtitle}>Real-time secure messaging</Text>
+            </View>
 
-            {/* Identifier Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email or Username</Text>
-              <TextInput
-                style={styles.input}
+            {/* Form Card */}
+            <Card style={styles.card} padding="lg">
+              <Text style={styles.cardTitle}>Sign In</Text>
+
+              {errorMessage && (
+                <View style={styles.errorBanner}>
+                  <Icon name="alert-circle" size={16} color={semanticColors.error} />
+                  <Text style={styles.errorText}>{errorMessage}</Text>
+                </View>
+              )}
+
+              {/* Identifier Input */}
+              <Input
+                label="Email or Username"
                 placeholder="Enter email or username"
-                placeholderTextColor="#64748B"
                 value={identifier}
                 onChangeText={(text) => {
                   setIdentifier(text);
@@ -104,57 +103,59 @@ export default function LoginScreen(): React.JSX.Element {
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={!isLoading}
+                iconLeft={<Icon name="user" size={18} color="#757B8C" />}
               />
+
+              {/* Password Input */}
+              <Input
+                label="Password"
+                placeholder="Enter your password"
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (errorMessage) setErrorMessage(null);
+                }}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                editable={!isLoading}
+                iconLeft={<Icon name="key" size={18} color="#757B8C" />}
+                iconRight={
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    <Icon
+                      name={showPassword ? 'eye-off' : 'eye'}
+                      size={18}
+                      color="#757B8C"
+                    />
+                  </TouchableOpacity>
+                }
+              />
+
+              {/* Submit Button */}
+              <Button
+                title="Sign In"
+                onPress={handleLogin}
+                variant="primary"
+                size="lg"
+                fullWidth
+                loading={isLoading}
+                disabled={isLoading}
+                style={styles.submitButton}
+              />
+            </Card>
+
+            {/* Footer Navigation */}
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Don't have an account? </Text>
+              <TouchableOpacity onPress={handleNavigateRegister} activeOpacity={0.7}>
+                <Text style={styles.footerLink}>Create Account</Text>
+              </TouchableOpacity>
             </View>
-
-            {/* Password Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password</Text>
-              <View style={styles.passwordWrapper}>
-                <TextInput
-                  style={styles.passwordInput}
-                  placeholder="Enter your password"
-                  placeholderTextColor="#64748B"
-                  value={password}
-                  onChangeText={(text) => {
-                    setPassword(text);
-                    if (errorMessage) setErrorMessage(null);
-                  }}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  editable={!isLoading}
-                />
-                <TouchableOpacity
-                  style={styles.eyeToggle}
-                  onPress={() => setShowPassword(!showPassword)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.eyeText}>{showPassword ? 'Hide' : 'Show'}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Submit Button */}
-            <TouchableOpacity
-              style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
-              onPress={handleLogin}
-              disabled={isLoading}
-              activeOpacity={0.8}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={styles.primaryButtonText}>Sign In</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Footer Navigation */}
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Don't have an account? </Text>
-            <TouchableOpacity onPress={handleNavigateRegister} activeOpacity={0.7}>
-              <Text style={styles.footerLink}>Create Account</Text>
-            </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -165,7 +166,7 @@ export default function LoginScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#181A20',
   },
   container: {
     flex: 1,
@@ -173,146 +174,88 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 24,
+  },
+  contentWrapper: {
+    width: '100%',
+    maxWidth: 440,
   },
   brandContainer: {
     alignItems: 'center',
     marginBottom: 32,
   },
   logoBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#1E293B',
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    backgroundColor: brandColors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#38BDF8',
-    marginBottom: 16,
-  },
-  logoText: {
-    fontSize: 28,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#F8FAFC',
-    letterSpacing: 0.5,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: '#94A3B8',
-    marginTop: 4,
-  },
-  card: {
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#334155',
+    marginBottom: 18,
     ...Platform.select({
       web: {
-        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
-      },
-      default: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
+        boxShadow: '0 8px 24px rgba(36, 107, 253, 0.35)',
       },
     }),
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 6,
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#757B8C',
+    textAlign: 'center',
+  },
+  card: {
+    backgroundColor: '#1F222A',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 24,
   },
   cardTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#F8FAFC',
+    color: '#FFFFFF',
     marginBottom: 20,
   },
   errorBanner: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderWidth: 1,
-    borderColor: '#EF4444',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: '#FCA5A5',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  inputGroup: {
-    marginBottom: 18,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#CBD5E1',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#0F172A',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#334155',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: '#F8FAFC',
-    fontSize: 15,
-  },
-  passwordWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0F172A',
-    borderRadius: 10,
+    backgroundColor: 'rgba(247, 85, 85, 0.12)',
     borderWidth: 1,
-    borderColor: '#334155',
-    paddingHorizontal: 14,
+    borderColor: 'rgba(247, 85, 85, 0.4)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 18,
+    gap: 8,
   },
-  passwordInput: {
-    flex: 1,
-    paddingVertical: 12,
-    color: '#F8FAFC',
-    fontSize: 15,
-  },
-  eyeToggle: {
-    paddingVertical: 8,
-    paddingLeft: 10,
-  },
-  eyeText: {
-    color: '#38BDF8',
+  errorText: {
+    color: semanticColors.error,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
+    lineHeight: 18,
+    flex: 1,
   },
-  primaryButton: {
-    backgroundColor: '#0284C7',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+  submitButton: {
     marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 28,
   },
   footerText: {
-    color: '#94A3B8',
+    color: '#757B8C',
     fontSize: 14,
   },
   footerLink: {
-    color: '#38BDF8',
+    color: brandColors.primary,
     fontSize: 14,
     fontWeight: '700',
   },

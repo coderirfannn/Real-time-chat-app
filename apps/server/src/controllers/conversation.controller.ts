@@ -116,6 +116,24 @@ export class ConversationController {
       timestamp: new Date().toISOString(),
     });
   };
+
+  public markAsRead = async (
+    req: Request<ConversationIdParamsInput>,
+    res: Response<ApiResponse<{ markedCount: number }>>,
+  ): Promise<void> => {
+    if (!req.user) {
+      throw new UnauthorizedError('Authentication required');
+    }
+
+    const markedCount = await this.service.markConversationAsRead(req.params.id, req.user.id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Conversation marked as read',
+      data: { markedCount },
+      timestamp: new Date().toISOString(),
+    });
+  };
 }
 
 export const conversationController = new ConversationController();

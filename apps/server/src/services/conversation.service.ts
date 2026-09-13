@@ -242,6 +242,26 @@ export class ConversationService {
       limit: result.limit,
     };
   }
+
+  /**
+   * Marks all messages in a conversation as read for the calling participant.
+   */
+  public async markConversationAsRead(
+    conversationId: string,
+    currentUserId: string,
+  ): Promise<number> {
+    const cleanConvId = conversationId.trim();
+    if (!Types.ObjectId.isValid(cleanConvId)) {
+      throw new BadRequestError('Invalid conversation ID format');
+    }
+
+    const isParticipant = await this.conversationRepo.isParticipant(cleanConvId, currentUserId);
+    if (!isParticipant) {
+      throw new ForbiddenError('You do not have permission to access this conversation');
+    }
+
+    return this.receiptRepo.markConversationAsRead(cleanConvId, currentUserId);
+  }
 }
 
 export const conversationService = new ConversationService();

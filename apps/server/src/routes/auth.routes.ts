@@ -4,6 +4,7 @@ import {
   loginSchema,
   refreshTokenSchema,
   logoutSchema,
+  changePasswordSchema,
 } from '@chatlock/validation';
 import { authController } from '../controllers/auth.controller.js';
 import { validate } from '../middleware/validate.middleware.js';
@@ -43,6 +44,12 @@ router.post(
 );
 
 // Protected routes requiring valid Bearer JWT
+router.post(
+  '/change-password',
+  requireAuth,
+  validate({ body: changePasswordSchema }),
+  asyncHandler(authController.changePassword),
+);
 router.post('/logout-all', requireAuth, asyncHandler(authController.logoutAll));
 router.get('/me', requireAuth, asyncHandler(authController.getMe));
 

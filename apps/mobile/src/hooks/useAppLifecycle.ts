@@ -5,7 +5,12 @@ import { socketManager } from '../services/socket/socket.manager';
 import { outboxSyncManager } from '../services/outbox/outbox-sync.manager';
 import { networkService } from '../services/network/network.service';
 
-export function useAppLifecycle(): void {
+export interface AppLifecycleOptions {
+  onResume?: () => void;
+  onBackground?: () => void;
+}
+
+export function useAppLifecycle(options: AppLifecycleOptions = {}): void {
   const appState = useRef<AppStateStatus>(AppState.currentState);
 
   useEffect(() => {
@@ -20,15 +25,17 @@ export function useAppLifecycle(): void {
 
       if (isComingToForeground) {
         handleAppResume();
+        options.onResume?.();
       } else if (nextAppState === 'background') {
         handleAppBackground();
+        options.onBackground?.();
       }
     });
 
     return () => {
       subscription.remove();
     };
-  }, []);
+  }, [options]);
 }
 
 function handleAppResume(): void {

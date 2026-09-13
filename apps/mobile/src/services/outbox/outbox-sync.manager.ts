@@ -127,6 +127,7 @@ export class OutboxSyncManager {
         content: retryPayload.content,
         type: message.type || 'text',
         attachments: message.attachments,
+        replyToMessageId: retryPayload.replyToMessageId || message.replyToMessageId,
       });
 
       if (ack.success) {

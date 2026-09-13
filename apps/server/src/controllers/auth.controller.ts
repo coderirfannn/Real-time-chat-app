@@ -5,6 +5,7 @@ import type {
   LoginInput,
   RefreshTokenInput,
   LogoutInput,
+  ChangePasswordInput,
 } from '@chatlock/validation';
 import { authService, type AuthService } from '../services/auth.service.js';
 import { UnauthorizedError } from '../errors/app-error.js';
@@ -97,6 +98,24 @@ export class AuthController {
       success: true,
       message: 'Profile retrieved successfully',
       data: user,
+      timestamp: new Date().toISOString(),
+    });
+  };
+
+  public changePassword = async (
+    req: Request<unknown, unknown, ChangePasswordInput>,
+    res: Response<ApiResponse<{ success: boolean }>>,
+  ): Promise<void> => {
+    if (!req.user) {
+      throw new UnauthorizedError('Authentication required');
+    }
+
+    await this.service.changePassword(req.user.id, req.body);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password changed successfully',
+      data: { success: true },
       timestamp: new Date().toISOString(),
     });
   };

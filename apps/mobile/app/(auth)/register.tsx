@@ -2,10 +2,8 @@ import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -14,6 +12,8 @@ import {
 import { useRouter } from 'expo-router';
 import { authApi } from '../../src/services/api/auth.api';
 import { useAuthStore } from '../../src/store/auth.store';
+import { Input, Button, Card, Icon } from '../../src/components/ui';
+import { brandColors, semanticColors } from '../../src/theme/colors';
 
 export default function RegisterScreen(): React.JSX.Element {
   const router = useRouter();
@@ -114,46 +114,42 @@ export default function RegisterScreen(): React.JSX.Element {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Header Brand */}
-          <View style={styles.brandContainer}>
-            <View style={styles.logoBadge}>
-              <Text style={styles.logoText}>✨</Text>
-            </View>
-            <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Join ChatLock today</Text>
-          </View>
-
-          {/* Form Card */}
-          <View style={styles.card}>
-            {errorMessage && (
-              <View style={styles.errorBanner}>
-                <Text style={styles.errorText}>⚠️ {errorMessage}</Text>
+          <View style={styles.contentWrapper}>
+            {/* Header Brand */}
+            <View style={styles.brandContainer}>
+              <View style={styles.logoBadge}>
+                <Icon name="shield" size={30} color="#FFFFFF" />
               </View>
-            )}
+              <Text style={styles.title}>Create Account</Text>
+              <Text style={styles.subtitle}>Join ChatLock today for secure messaging</Text>
+            </View>
 
-            {/* Display Name Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Display Name</Text>
-              <TextInput
-                style={styles.input}
+            {/* Form Card */}
+            <Card style={styles.card} padding="lg">
+              {errorMessage && (
+                <View style={styles.errorBanner}>
+                  <Icon name="alert-circle" size={16} color={semanticColors.error} />
+                  <Text style={styles.errorText}>{errorMessage}</Text>
+                </View>
+              )}
+
+              {/* Display Name Input */}
+              <Input
+                label="Display Name"
                 placeholder="e.g. Alex Smith"
-                placeholderTextColor="#64748B"
                 value={displayName}
                 onChangeText={(text) => {
                   setDisplayName(text);
                   if (errorMessage) setErrorMessage(null);
                 }}
                 editable={!isLoading}
+                iconLeft={<Icon name="user" size={18} color="#757B8C" />}
               />
-            </View>
 
-            {/* Username Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Username</Text>
-              <TextInput
-                style={styles.input}
+              {/* Username Input */}
+              <Input
+                label="Username"
                 placeholder="e.g. alex_smith"
-                placeholderTextColor="#64748B"
                 value={username}
                 onChangeText={(text) => {
                   setUsername(text);
@@ -162,16 +158,14 @@ export default function RegisterScreen(): React.JSX.Element {
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={!isLoading}
+                iconLeft={<Icon name="edit" size={18} color="#757B8C" />}
+                hint="Only letters, numbers, and underscores"
               />
-            </View>
 
-            {/* Email Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email Address</Text>
-              <TextInput
-                style={styles.input}
+              {/* Email Input */}
+              <Input
+                label="Email Address"
                 placeholder="e.g. alex@example.com"
-                placeholderTextColor="#64748B"
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
@@ -181,43 +175,44 @@ export default function RegisterScreen(): React.JSX.Element {
                 keyboardType="email-address"
                 autoCorrect={false}
                 editable={!isLoading}
+                iconLeft={<Icon name="mail" size={18} color="#757B8C" />}
               />
-            </View>
 
-            {/* Password Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password</Text>
-              <View style={styles.passwordWrapper}>
-                <TextInput
-                  style={styles.passwordInput}
-                  placeholder="Min 8 chars, uppercase, lowercase, number"
-                  placeholderTextColor="#64748B"
-                  value={password}
-                  onChangeText={(text) => {
-                    setPassword(text);
-                    if (errorMessage) setErrorMessage(null);
-                  }}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  editable={!isLoading}
-                />
-                <TouchableOpacity
-                  style={styles.eyeToggle}
-                  onPress={() => setShowPassword(!showPassword)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.eyeText}>{showPassword ? 'Hide' : 'Show'}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+              {/* Password Input */}
+              <Input
+                label="Password"
+                placeholder="At least 8 characters"
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (errorMessage) setErrorMessage(null);
+                }}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                editable={!isLoading}
+                iconLeft={<Icon name="key" size={18} color="#757B8C" />}
+                hint="Must contain uppercase, lowercase, and a number"
+                iconRight={
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    <Icon
+                      name={showPassword ? 'eye-off' : 'eye'}
+                      size={18}
+                      color="#757B8C"
+                    />
+                  </TouchableOpacity>
+                }
+              />
 
-            {/* Confirm Password Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Confirm Password</Text>
-              <TextInput
-                style={styles.input}
+              {/* Confirm Password Input */}
+              <Input
+                label="Confirm Password"
                 placeholder="Re-enter your password"
-                placeholderTextColor="#64748B"
                 value={confirmPassword}
                 onChangeText={(text) => {
                   setConfirmPassword(text);
@@ -226,30 +221,29 @@ export default function RegisterScreen(): React.JSX.Element {
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 editable={!isLoading}
+                iconLeft={<Icon name="shield" size={18} color="#757B8C" />}
               />
+
+              {/* Submit Button */}
+              <Button
+                title="Create Account"
+                onPress={handleRegister}
+                variant="primary"
+                size="lg"
+                fullWidth
+                loading={isLoading}
+                disabled={isLoading}
+                style={styles.submitButton}
+              />
+            </Card>
+
+            {/* Footer Navigation */}
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Already have an account? </Text>
+              <TouchableOpacity onPress={handleNavigateLogin} activeOpacity={0.7}>
+                <Text style={styles.footerLink}>Sign In</Text>
+              </TouchableOpacity>
             </View>
-
-            {/* Submit Button */}
-            <TouchableOpacity
-              style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
-              onPress={handleRegister}
-              disabled={isLoading}
-              activeOpacity={0.8}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={styles.primaryButtonText}>Create Account</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Footer Navigation */}
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Already have an account? </Text>
-            <TouchableOpacity onPress={handleNavigateLogin} activeOpacity={0.7}>
-              <Text style={styles.footerLink}>Sign In</Text>
-            </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -260,7 +254,7 @@ export default function RegisterScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#181A20',
   },
   container: {
     flex: 1,
@@ -268,140 +262,83 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 24,
+  },
+  contentWrapper: {
+    width: '100%',
+    maxWidth: 460,
   },
   brandContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 28,
   },
   logoBadge: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#1E293B',
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    backgroundColor: brandColors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#38BDF8',
-    marginBottom: 12,
-  },
-  logoText: {
-    fontSize: 26,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#F8FAFC',
-    letterSpacing: 0.5,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#94A3B8',
-    marginTop: 4,
-  },
-  card: {
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#334155',
+    marginBottom: 18,
     ...Platform.select({
       web: {
-        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
-      },
-      default: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
+        boxShadow: '0 8px 24px rgba(36, 107, 253, 0.35)',
       },
     }),
   },
-  errorBanner: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderWidth: 1,
-    borderColor: '#EF4444',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: '#FCA5A5',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#CBD5E1',
+  title: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#FFFFFF',
     marginBottom: 6,
+    letterSpacing: -0.5,
   },
-  input: {
-    backgroundColor: '#0F172A',
-    borderRadius: 10,
+  subtitle: {
+    fontSize: 14,
+    color: '#757B8C',
+    textAlign: 'center',
+  },
+  card: {
+    backgroundColor: '#1F222A',
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#334155',
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    color: '#F8FAFC',
-    fontSize: 15,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 20,
   },
-  passwordWrapper: {
+  errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0F172A',
-    borderRadius: 10,
+    backgroundColor: 'rgba(247, 85, 85, 0.12)',
     borderWidth: 1,
-    borderColor: '#334155',
-    paddingHorizontal: 14,
+    borderColor: 'rgba(247, 85, 85, 0.4)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    gap: 8,
   },
-  passwordInput: {
-    flex: 1,
-    paddingVertical: 11,
-    color: '#F8FAFC',
-    fontSize: 15,
-  },
-  eyeToggle: {
-    paddingVertical: 8,
-    paddingLeft: 10,
-  },
-  eyeText: {
-    color: '#38BDF8',
+  errorText: {
+    color: semanticColors.error,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
+    lineHeight: 18,
+    flex: 1,
   },
-  primaryButton: {
-    backgroundColor: '#0284C7',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
+  submitButton: {
+    marginTop: 10,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 24,
+    marginBottom: 12,
   },
   footerText: {
-    color: '#94A3B8',
+    color: '#757B8C',
     fontSize: 14,
   },
   footerLink: {
-    color: '#38BDF8',
+    color: brandColors.primary,
     fontSize: 14,
     fontWeight: '700',
   },

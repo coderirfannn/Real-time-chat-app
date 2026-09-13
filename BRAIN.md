@@ -1,7 +1,7 @@
 # BRAIN.md — ChatLock Platform Architecture & System Design
 
 **Project**: ChatLock — Production-Grade Real-Time Messaging Platform  
-**Version**: 0.16.0 (Secure Media & File Attachments Pipeline, Signed Storage Uploads & MIME Magic Bytes Verification)  
+**Version**: 0.17.0 (Production Behavior Alignment, Real-Time Reactions, Monotonic Receipt Sync, & Dynamic Mobile Experience)  
 **Status**: Production Industry-Grade Architecture, Fault-Tolerant Real-Time Pipeline, and Multi-Node Cluster Ready
 
 ---
@@ -22,7 +22,10 @@ ChatLock is a secure, high-concurrency, real-time messaging platform built for c
 8. **Offline-First Reliability**: Persistent outbox storage, exponential backoff retries with jitter, idempotency deduplication (`clientMessageId`), and lifecycle foreground reconciliation.
 9. **Ephemeral Presence & Typing**: Zero database write heartbeats via Redis 60s TTL keys, durable `lastSeenAt` MongoDB persistence on disconnect, and ephemeral room-scoped typing indicators with auto-expiration.
 10. **Monotonic Delivery & Read Receipts**: Strict unidirectional progression ($\text{sent} \to \text{delivered} \to \text{read}$), durable persistence in MongoDB `MessageReceipt`, multi-device synchronization, and duplicate-safe idempotent updates.
-11. **Live Global Sync & Workflow Polish**: Live conversation list updates across all chats, instant search filter, and User Profile & Security Settings management.
+11. **Live Global Sync & Dual-Room Broadcasting**: Dual broadcasting to `conversation:{id}` and `user:{participantId}` rooms with automatic socket deduplication, ensuring inactive/backgrounded users and conversation list screens update immediately with live preview snippets and unread badges.
+12. **Persistent Emoji Reactions Subsystem**: Atomic database persistence in `Message.reactions`, bidirectional `message:reaction` Socket.IO events, optimistic client toggle, and live multi-peer sync.
+13. **Dynamic Viewport & Mobile Keyboard Ergonomics**: Clamped visual viewport (`100dvh`, `visualViewport.height`), flexbox shrink optimization (`minHeight: 0`), dynamic multi-line composer auto-expansion (`38px -> 120px`) with native layout animation, and zero duplicate navigation headers across all stack screens.
+14. **Workflow Polish & App Protection**: Instant contact search filter, biometric App Lock protection, and User Profile & Security Settings management.
 
 ---
 
@@ -129,6 +132,15 @@ The environment system strictly validates 13 distinct categories in `@chatlock/c
 - [x] **Task 13 — Delivery and Read Receipts**: Full monotonic receipt lifecycle ($\text{sent} \to \text{delivered} \to \text{read}$), real-time `message:delivered` and `message:read` Socket.IO events, durable `MessageReceipt` MongoDB persistence, multi-device synchronization, client automatic receipt dispatch on receive/read, and UI status indicator rendering (✓, ✓✓ grey, ✓✓ cyan).
 - [x] **Task 14 — Production Hardening & Security Fortification**: Recursive NoSQL injection sanitization, token reuse detection with full session family revocation (RFC 6819), timing attack mitigation on authentication, Socket.IO duplex event rate limiting (max 40 ops/sec per socket), Socket.IO `@socket.io/redis-adapter` for multi-node cluster scaling, live global conversation list sync with unread badges, instant search filter, and User Profile & Security Settings management (`settings.tsx`, `PATCH /api/v1/users/me`, `POST /api/v1/auth/logout-all`).
 - [x] **Task 15 — Media & File Attachments**: Enterprise-grade secure media messaging subsystem. Zero binary storage inside MongoDB (only validated metadata persisted), direct signed upload pipeline (`POST /api/v1/media/upload-url` issuing HMAC-signed descriptors with 15-minute expiration), binary magic bytes inspection (JPEG, PNG, GIF, WEBP, PDF, ZIP, MP4, MP3, WAV) preventing MIME spoofing, strict size boundaries (max 25MB), Local and S3 storage providers with path traversal defense, and resilient mobile UX with staging preview ribbon, thumbnail rendering, document descriptors, and non-blocking upload failure isolation.
-- [ ] **Task 16 — Push Notifications**: FCM & APNs integration, background delivery tokens in `Device` collection, notification badges, and offline payload delivery.
-- [ ] **Task 17 — End-to-End Encryption (E2EE)**: Pre-key bundles, Signal Protocol / Double Ratchet session management, encrypted payloads, and cryptographic audit.
-- [ ] **Task 18 — Production Observability & Sentry**: Sentry crash reporting, Prometheus metrics, and load testing.
+- [x] **Task 16 — Production Behavior Alignment & Mobile Ergonomics Overhaul**: Alignment with real-world production messaging architectures (WhatsApp, Telegram, Signal):
+  - **Persistent Emoji Reactions Pipeline**: Atomic `$pull`/`$push` operations in `MessageRepository.toggleReaction`, Mongoose schema with `reactions: [reactionSchema]`, bidirectional `SocketEvents.MESSAGE_REACTION` events, optimistic client rendering, and live multi-peer sync.
+  - **Monotonic Receipt Initialization on Message Send**: Fixed critical bug where `MessageReceipt` records were never initialized on send, ensuring recipient unread counts increment monotonically and badges display accurately across all participants.
+  - **Dual-Room Real-Time Broadcasting**: Broadcasts `message:new` concurrently to `conversation:{id}` and `user:{participantId}` with socket-level deduplication, ensuring inactive/backgrounded users and conversation list screens update immediately with live preview snippets.
+  - **Dynamic Conversation List Sync**: Live updates to both `lastMessage` and `lastMessageId`, with query cache invalidation when a message arrives for an unseen conversation.
+  - **New Chat Modal Navigation Resolution**: Fixed ID extraction (`resObj.conversation?.id || resObj.id`), ensuring instant seamless routing from contact selection to the chat feed.
+  - **Dynamic Viewport Clamping & Soft Keyboard Handling**: Clamped screen with `100dvh` and dynamic `window.visualViewport.height`, resolved flexbox child shrink (`minHeight: 0`), dynamic multi-line composer auto-expansion (`38px -> 120px`) with native layout animations, spring pulse on send, and focus stabilization.
+  - **Header Cleanup**: Eliminated duplicate stacked navigation headers across all stack screens (`index`, `settings`, `chat/[id]`).
+  - **Test Health**: 100% test pass rate across 198 server tests and 90 mobile tests with zero TypeScript compiler errors.
+- [ ] **Task 17 — Push Notifications**: FCM & APNs integration, background delivery tokens in `Device` collection, notification badges, and offline payload delivery.
+- [ ] **Task 18 — End-to-End Encryption (E2EE)**: Pre-key bundles, Signal Protocol / Double Ratchet session management, encrypted payloads, and cryptographic audit.
+- [ ] **Task 19 — Production Observability & Sentry**: Sentry crash reporting, Prometheus metrics, and load testing.
