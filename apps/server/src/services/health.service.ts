@@ -66,8 +66,9 @@ export class HealthService {
     const redisPingOk = await pingRedis();
     const redisReady = isRedisReady() && redisPingOk;
 
-    // Both primary dependencies are expected for healthy readiness
-    const allReady = mongoReady && redisReady;
+    // MongoDB is required for core application functionality.
+    // Redis is used for multi-node cluster scaling and presence cache when available.
+    const allReady = mongoReady;
 
     return {
       status: allReady ? 'ok' : 'unhealthy',

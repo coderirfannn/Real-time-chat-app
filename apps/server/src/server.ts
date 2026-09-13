@@ -41,10 +41,10 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
     try {
       await connectRedis();
     } catch (err) {
-      serverLogger.error('Failed to establish initial Redis connection', err as Error);
-      if (config.app.isProduction) {
-        throw err;
-      }
+      serverLogger.warn(
+        'Failed to establish initial Redis connection; operating in standalone in-memory mode',
+        { error: (err as Error).message },
+      );
     }
   }
 
