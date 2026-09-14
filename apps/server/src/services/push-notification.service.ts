@@ -1,4 +1,5 @@
 import { logger } from '../utils/logger.js';
+import { deviceRepository } from '../repositories/device.repository.js';
 
 const pushLogger = logger.child('PushNotificationService');
 
@@ -55,6 +56,7 @@ export class PushNotificationService {
       body: string;
       data?: Record<string, unknown>;
       sound?: string;
+      badge?: number;
       channelId?: string;
     },
   ): Promise<PushSendResult> {
@@ -71,6 +73,7 @@ export class PushNotificationService {
       sound: payload.sound || 'default',
       channelId: payload.channelId || 'chat_messages',
       priority: 'high',
+      badge: typeof payload.badge === 'number' ? Math.max(0, payload.badge) : undefined,
       data: payload.data,
     }));
 
@@ -101,11 +104,35 @@ export class PushNotificationService {
           continue;
         }
 
-        const resData = (await response.json()) as { data?: Array<{ status: string; message?: string }> };
+        const resData = (await response.json()) as {
+          data?: Array<{
+            status: string;
+            message?: string;
+            details?: { error?: string };
+          }>;
+        };
         const tickets = Array.isArray(resData?.data) ? resData.data : [];
 
         const okCount = tickets.filter((t) => t.status === 'ok').length;
         const errCount = tickets.length - okCount;
+
+        // Auto-deactivate tokens that Expo reports as unregistered
+        const tokensToDeactivate: string[] = [];
+        tickets.forEach((ticket, idx) => {
+          if (
+            ticket.status === 'error' &&
+            ticket.details?.error === 'DeviceNotRegistered' &&
+            chunk[idx]?.to
+          ) {
+            tokensToDeactivate.push(chunk[idx]!.to);
+          }
+        });
+
+        if (tokensToDeactivate.length > 0) {
+          deviceRepository.deactivatePushTokens(tokensToDeactivate).catch((err) => {
+            pushLogger.warn('Failed to auto-deactivate unregistered push tokens', { error: err });
+          });
+        }
 
         totalSent += okCount;
         totalFailed += errCount;

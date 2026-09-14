@@ -9,5 +9,6 @@ const router: Router = Router();
 router.use(requireAuth);
 
 router.post('/push-token', asyncHandler(deviceController.registerPushToken));
+router.post('/push-token/deactivate', asyncHandler(deviceController.deactivatePushToken));
 
 export default router;

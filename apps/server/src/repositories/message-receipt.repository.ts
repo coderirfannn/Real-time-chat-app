@@ -119,6 +119,18 @@ export class MessageReceiptRepository extends BaseRepository<IMessageReceiptDoc>
   }
 
   /**
+   * Counts total unread messages for a user across all active conversations.
+   */
+  public async getTotalUnreadCountForUser(
+    userId: string | Types.ObjectId,
+  ): Promise<number> {
+    return this.count({
+      userId: new Types.ObjectId(userId),
+      status: { $ne: 'read' },
+    });
+  }
+
+  /**
    * Marks all messages in a conversation as read for a given user.
    */
   public async markConversationAsRead(

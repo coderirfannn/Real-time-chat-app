@@ -55,6 +55,35 @@ export class DeviceController {
       timestamp: new Date().toISOString(),
     });
   };
+
+  public deactivatePushToken = async (
+    req: Request<unknown, unknown, { deviceId?: string; pushToken?: string }>,
+    res: Response<ApiResponse<{ deactivated: boolean }>>,
+  ): Promise<void> => {
+    if (!req.user) {
+      throw new UnauthorizedError('Authentication required');
+    }
+
+    const { deviceId, pushToken } = req.body;
+    if (deviceId) {
+      await this.deviceRepo.deactivateDevice(req.user.id, deviceId);
+    }
+    if (pushToken) {
+      await this.deviceRepo.deactivatePushTokens([pushToken]);
+    }
+
+    deviceLogger.info('Deactivated push token for user device', {
+      userId: req.user.id,
+      deviceId,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Push token deactivated successfully',
+      data: { deactivated: true },
+      timestamp: new Date().toISOString(),
+    });
+  };
 }
 
 export const deviceController = new DeviceController();

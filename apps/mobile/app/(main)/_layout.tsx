@@ -1,7 +1,8 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useEffect } from 'react';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { AppShell, type MainTabKey } from '../../src/components/layout';
 import { useConversations } from '../../src/features/chat/hooks/useConversations';
+import { notificationService } from '../../src/services/notifications/notification.service';
 
 export default function MainLayout() {
   const pathname = usePathname();
@@ -11,6 +12,11 @@ export default function MainLayout() {
   const totalUnreadCount = useMemo(() => {
     return conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
   }, [conversations]);
+
+  // Synchronize OS app launcher icon badge count with live total unread count
+  useEffect(() => {
+    notificationService.syncBadgeCount(totalUnreadCount).catch(() => {});
+  }, [totalUnreadCount]);
 
   const activeTab: MainTabKey = useMemo(() => {
     if (pathname && pathname.includes('/settings')) return 'settings';

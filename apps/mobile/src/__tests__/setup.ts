@@ -85,6 +85,8 @@ vi.mock('expo-notifications', () => ({
   getExpoPushTokenAsync: vi.fn().mockResolvedValue({ data: 'ExponentPushToken[mock_token_123]' }),
   scheduleNotificationAsync: vi.fn().mockResolvedValue('notification-id-123'),
   addNotificationResponseReceivedListener: vi.fn().mockReturnValue({ remove: vi.fn() }),
+  setBadgeCountAsync: vi.fn().mockResolvedValue(true),
+  getBadgeCountAsync: vi.fn().mockResolvedValue(0),
   AndroidImportance: {
     MAX: 5,
     HIGH: 4,

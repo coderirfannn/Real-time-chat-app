@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/auth.store';
 import { socketManager } from '../services/socket/socket.manager';
 import { outboxSyncManager } from '../services/outbox/outbox-sync.manager';
 import { networkService } from '../services/network/network.service';
+import { notificationService } from '../services/notifications/notification.service';
 
 export interface AppLifecycleOptions {
   onResume?: () => void;
@@ -48,6 +49,11 @@ function handleAppResume(): void {
 
   // 2. Drain pending outbox messages
   outboxSyncManager.processQueue().catch(() => {});
+
+  // 3. Proactively ensure device push token is fresh and registered with backend
+  if (accessToken) {
+    notificationService.registerForPushNotifications().catch(() => {});
+  }
 }
 
 function handleAppBackground(): void {

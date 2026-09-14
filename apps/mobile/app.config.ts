@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import type { ExpoConfig, ConfigContext } from 'expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => {
@@ -59,6 +61,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       package: bundleId,
       versionCode: 1,
       permissions: ['android.permission.VIBRATE', 'android.permission.POST_NOTIFICATIONS'],
+      ...(fs.existsSync(path.resolve(__dirname, 'google-services.json'))
+        ? { googleServicesFile: './google-services.json' }
+        : process.env.GOOGLE_SERVICES_JSON
+          ? { googleServicesFile: process.env.GOOGLE_SERVICES_JSON }
+          : {}),
     },
     web: {
       favicon: './assets/favicon.png',

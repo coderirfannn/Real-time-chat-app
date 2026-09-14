@@ -69,6 +69,61 @@ describe('PushNotificationService & DeviceController Unit Tests', () => {
       expect(requestBody[0].data.conversationId).toBe('conv_123');
     });
 
+    it('dispatches push notifications with badge count to Expo Push API successfully', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [{ status: 'ok', id: 'ticket_123' }],
+        }),
+      });
+      global.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await pushNotificationService.sendPushNotifications(
+        ['ExponentPushToken[sample_token_1]'],
+        {
+          title: 'Alice',
+          body: 'Hello there!',
+          badge: 4,
+          data: { conversationId: 'conv_123' },
+        },
+      );
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(result.sentCount).toBe(1);
+      expect(result.failedCount).toBe(0);
+
+      const callArgs = mockFetch.mock.calls[0];
+      const requestBody = JSON.parse(callArgs?.[1]?.body as string);
+      expect(requestBody[0].badge).toBe(4);
+    });
+
+    it('auto-deactivates tokens when Expo reports DeviceNotRegistered', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [
+            {
+              status: 'error',
+              message: 'Device is not registered',
+              details: { error: 'DeviceNotRegistered' },
+            },
+          ],
+        }),
+      });
+      global.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await pushNotificationService.sendPushNotifications(
+        ['ExponentPushToken[stale_token_xyz]'],
+        {
+          title: 'Alice',
+          body: 'Hello!',
+        },
+      );
+
+      expect(result.sentCount).toBe(0);
+      expect(result.failedCount).toBe(1);
+    });
+
     it('handles Expo Push API network failure gracefully', async () => {
       const mockFetch = vi.fn().mockRejectedValue(new Error('Network offline'));
       global.fetch = mockFetch as unknown as typeof fetch;
@@ -93,6 +148,8 @@ describe('PushNotificationService & DeviceController Unit Tests', () => {
     beforeEach(() => {
       mockDeviceRepo = {
         upsertDevice: vi.fn().mockResolvedValue(null),
+        deactivateDevice: vi.fn().mockResolvedValue(null),
+        deactivatePushTokens: vi.fn().mockResolvedValue(1),
       };
       controller = new DeviceController(mockDeviceRepo as DeviceRepository);
     });
@@ -128,6 +185,35 @@ describe('PushNotificationService & DeviceController Unit Tests', () => {
         expect.objectContaining({
           success: true,
           data: { registered: true },
+        }),
+      );
+    });
+
+    it('successfully deactivates push token for authenticated user on logout', async () => {
+      const req = {
+        user: { id: 'user_123' },
+        body: {
+          deviceId: 'my_android_phone',
+          pushToken: 'ExponentPushToken[valid_token_xyz]',
+        },
+      } as unknown as Request<unknown, unknown, { pushToken?: string; deviceId?: string }>;
+
+      const statusMock = vi.fn().mockReturnThis();
+      const jsonMock = vi.fn();
+      const res = {
+        status: statusMock,
+        json: jsonMock,
+      } as unknown as Response;
+
+      await controller.deactivatePushToken(req, res);
+
+      expect(mockDeviceRepo.deactivateDevice).toHaveBeenCalledWith('user_123', 'my_android_phone');
+      expect(mockDeviceRepo.deactivatePushTokens).toHaveBeenCalledWith(['ExponentPushToken[valid_token_xyz]']);
+      expect(statusMock).toHaveBeenCalledWith(200);
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          data: { deactivated: true },
         }),
       );
     });

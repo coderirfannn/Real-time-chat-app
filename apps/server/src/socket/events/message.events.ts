@@ -12,6 +12,7 @@ import { roomManager } from '../rooms.js';
 import type { AuthenticatedSocket } from '../middleware/auth.socket.middleware.js';
 import type { TypedSocketServer } from '../index.js';
 import { deviceRepository } from '../../repositories/device.repository.js';
+import { messageReceiptRepository } from '../../repositories/message-receipt.repository.js';
 import { pushNotificationService } from '../../services/push-notification.service.js';
 import { AppError } from '../../errors/app-error.js';
 import { ErrorCode } from '../../errors/error-codes.js';
@@ -102,13 +103,19 @@ export function registerMessageEvents(
               ? 'Sent an attachment'
               : 'Sent a message');
 
-          deviceRepository
-            .findActivePushTokensByUsers(recipientIds)
-            .then((tokens) => {
+          // Concurrently fetch active device tokens and calculate total unread badge count for each recipient
+          Promise.all(
+            recipientIds.map(async (recipientId) => {
+              const [tokens, unreadCount] = await Promise.all([
+                deviceRepository.findActiveTokensByUser(recipientId),
+                messageReceiptRepository.getTotalUnreadCountForUser(recipientId).catch(() => 1),
+              ]);
+
               if (tokens && tokens.length > 0) {
                 return pushNotificationService.sendPushNotifications(tokens, {
                   title: senderDisplayName,
                   body: notificationBody,
+                  badge: Math.max(1, unreadCount),
                   channelId: 'chat_messages',
                   data: {
                     conversationId: validPayload.conversationId,
@@ -118,10 +125,10 @@ export function registerMessageEvents(
                 });
               }
               return null;
-            })
-            .catch((err) => {
-              socketMsgLogger.warn('Background push notification error', { error: err });
-            });
+            }),
+          ).catch((err) => {
+            socketMsgLogger.warn('Background push notification error', { error: err });
+          });
         }
       }
 

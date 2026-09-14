@@ -3,6 +3,7 @@ import type { UserProfile, AuthResponse } from '@chatlock/shared-types';
 import { secureStorage } from '../services/storage/secure-storage.service';
 import { authApi } from '../services/api/auth.api';
 import { apiClient } from '../services/api/client';
+import { notificationService } from '../services/notifications/notification.service';
 
 export interface AuthState {
   user: UserProfile | null;
@@ -115,6 +116,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoading: false,
       });
 
+      // Proactively register push token for authenticated restored session
+      notificationService.registerForPushNotifications().catch(() => {});
+
       // Background validation of session to ensure freshness
       try {
         const currentUser = await authApi.getMe();
@@ -149,6 +153,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isAuthenticated: true,
       isLoading: false,
     });
+
+    // Proactively register push token on successful login/signup
+    notificationService.registerForPushNotifications().catch(() => {});
   },
 
   setUser: (user: UserProfile) => {
@@ -163,6 +170,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
+    // Proactively deactivate push token on server and clear app launcher badge
+    await notificationService.deactivatePushToken().catch(() => {});
+    await notificationService.clearBadge().catch(() => {});
+
     const { refreshToken } = get();
     if (refreshToken) {
       try {

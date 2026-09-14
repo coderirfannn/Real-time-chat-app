@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { useNotificationStore } from '../../store/notification.store';
 import { apiClient } from '../api/client';
+import { secureStorage } from '../storage/secure-storage.service';
 
 export interface IncomingMessageNotificationPayload {
   conversationId: string;
@@ -53,6 +54,7 @@ export class NotificationService {
   private static instance: NotificationService | null = null;
   private isInitialized = false;
   private pushToken: string | null = null;
+  private deviceId: string | null = null;
 
   private constructor() {}
 
@@ -73,6 +75,66 @@ export class NotificationService {
 
   public getPushToken(): string | null {
     return this.pushToken;
+  }
+
+  /**
+   * Retrieves or generates a persistent device UUID stored in secure storage.
+   */
+  public async getDeviceId(): Promise<string> {
+    if (this.deviceId) return this.deviceId;
+
+    try {
+      let storedId = await secureStorage.getItem('chatlock_device_uuid');
+      if (!storedId) {
+        const rand =
+          Math.random().toString(36).substring(2, 10) +
+          Math.random().toString(36).substring(2, 10);
+        storedId = `dev_${Platform.OS}_${Date.now().toString(36)}_${rand}`;
+        await secureStorage.setItem('chatlock_device_uuid', storedId);
+      }
+      this.deviceId = storedId;
+      return storedId;
+    } catch {
+      return `dev_${Platform.OS}_fallback`;
+    }
+  }
+
+  /**
+   * Synchronizes the native application launcher icon badge count on iOS/Android.
+   */
+  public async syncBadgeCount(count: number): Promise<void> {
+    if (Platform.OS === 'web') return;
+    try {
+      const safeCount = Math.max(0, Math.floor(count));
+      if (typeof Notifications.setBadgeCountAsync === 'function') {
+        await Promise.resolve(Notifications.setBadgeCountAsync(safeCount)).catch(() => {});
+      }
+    } catch (err) {
+      console.warn('[NotificationService] Failed to set badge count:', err);
+    }
+  }
+
+  /**
+   * Clears the native application launcher icon badge count (resets to 0).
+   */
+  public async clearBadge(): Promise<void> {
+    await this.syncBadgeCount(0);
+  }
+
+  /**
+   * Deactivates the device push token on the backend upon user logout.
+   */
+  public async deactivatePushToken(): Promise<void> {
+    if (Platform.OS === 'web' || !this.pushToken) return;
+    try {
+      const deviceId = await this.getDeviceId();
+      await apiClient.post('/devices/push-token/deactivate', {
+        deviceId,
+        pushToken: this.pushToken,
+      });
+    } catch {
+      // Safe non-blocking sync
+    }
   }
 
   /**
@@ -112,12 +174,16 @@ export class NotificationService {
     if (Platform.OS === 'web') return null;
 
     try {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
+      const permResult = Notifications.getPermissionsAsync
+        ? await Promise.resolve(Notifications.getPermissionsAsync()).catch(() => null)
+        : null;
+      let finalStatus = permResult?.status;
 
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
+      if (finalStatus !== 'granted') {
+        const reqResult = Notifications.requestPermissionsAsync
+          ? await Promise.resolve(Notifications.requestPermissionsAsync()).catch(() => null)
+          : null;
+        finalStatus = reqResult?.status;
       }
 
       if (finalStatus !== 'granted') {
@@ -129,20 +195,25 @@ export class NotificationService {
         Constants.easConfig?.projectId ??
         'd0d37a73-72a4-4fcb-902a-e3ded337236f';
 
-      const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId,
-      });
+      const tokenData = typeof Notifications.getExpoPushTokenAsync === 'function'
+        ? await Promise.resolve(
+            Notifications.getExpoPushTokenAsync({
+              projectId,
+            }),
+          ).catch(() => null)
+        : null;
 
       const token = tokenData?.data || null;
       this.pushToken = token;
 
       if (token) {
+        const deviceId = await this.getDeviceId();
         // Register token with backend server
         try {
           await apiClient.post('/devices/push-token', {
             pushToken: token,
             platform: Platform.OS,
-            deviceId: Constants.sessionId || `device_${Platform.OS}`,
+            deviceId,
             appVersion: Constants.expoConfig?.version || '0.1.0',
           });
         } catch {
