@@ -73,21 +73,63 @@ export interface AdminUserDetail extends AdminUserListItem {
   moderationHistory: AdminAuditLogItem[];
 }
 
-export interface AdminReportItem {
+export type ReportStatus =
+  'OPEN' | 'UNDER_REVIEW' | 'DISMISSED' | 'WARNED' | 'SUSPENDED' | 'BANNED';
+
+export type ReportTargetType = 'USER' | 'MESSAGE' | 'CONVERSATION';
+
+export type ReportReason =
+  | 'HARASSMENT'
+  | 'SPAM'
+  | 'HATE_SPEECH'
+  | 'INAPPROPRIATE_CONTENT'
+  | 'IMPERSONATION'
+  | 'THREATS'
+  | 'OTHER';
+
+export type ModerationAction = 'DISMISS' | 'WARN' | 'SUSPEND' | 'BAN';
+
+export interface IReport {
   id: ID;
   reporterId: ID;
   reporterUsername?: string;
+  reporterDisplayName?: string;
   reportedUserId: ID;
   reportedUsername?: string;
-  targetType: 'USER' | 'MESSAGE' | 'CONVERSATION';
+  reportedDisplayName?: string;
+  targetType: ReportTargetType;
   targetId: string;
-  reason: string;
+  messageId?: string;
+  conversationId?: string;
+  reason: ReportReason | string;
   details?: string;
-  status: 'PENDING' | 'RESOLVED' | 'DISMISSED';
+  description?: string;
+  status: ReportStatus;
+  resolutionAction?: ModerationAction;
   resolutionNotes?: string;
+  warningMessage?: string;
   resolvedBy?: string;
+  resolvedAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export type AdminReportItem = IReport;
+
+export interface CreateReportPayload {
+  reportedUserId?: string;
+  targetType: ReportTargetType;
+  targetId: string;
+  messageId?: string;
+  conversationId?: string;
+  reason: ReportReason | string;
+  description?: string;
+}
+
+export interface ResolveReportPayload {
+  action: ModerationAction;
+  notes?: string;
+  warningMessage?: string;
 }
 
 export interface AdminGroupItem {

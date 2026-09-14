@@ -7,3 +7,4 @@ export * from './message-receipt.repository.js';
 export * from './device.repository.js';
 export * from './audit-log.repository.js';
 export * from './report.repository.js';
+export * from './device-key.repository.js';

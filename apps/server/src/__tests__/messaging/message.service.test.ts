@@ -86,7 +86,11 @@ describe('MessageService Unit Tests', () => {
         clientMessageId,
         type: 'text',
         content: 'Hello, World!',
+        attachments: undefined,
         replyToMessageId: undefined,
+        encryptionState: 'LEGACY_PLAINTEXT',
+        senderDeviceId: undefined,
+        e2eePayload: undefined,
       });
       expect(mockConvRepo.updateLastMessage).toHaveBeenCalledWith(
         convId,

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { idSchema } from './common.js';
 import { messageAttachmentSchema } from './media.js';
+import { e2eeEncryptedPayloadSchema } from './e2ee.js';
 
 export const createDirectConversationSchema = z
   .object({
@@ -43,7 +44,7 @@ export const sendMessageSchema = z
   .object({
     conversationId: idSchema,
     clientMessageId: z.string().min(1, 'clientMessageId is required').max(100),
-    content: z.string().max(5000, 'Message is too long').default(''),
+    content: z.string().max(10000, 'Message is too long').default(''),
     type: z.enum(['text', 'image', 'file', 'audio', 'video', 'system']).default('text'),
     attachments: z.array(messageAttachmentSchema).max(10).optional(),
     replyToMessageId: idSchema
@@ -52,12 +53,17 @@ export const sendMessageSchema = z
       .optional()
       .transform((val) => val || undefined),
     tempId: z.string().optional(),
+    encryptionState: z.enum(['LEGACY_PLAINTEXT', 'E2EE']).optional(),
+    senderDeviceId: z.string().max(128).optional(),
+    e2eePayload: e2eeEncryptedPayloadSchema.optional(),
   })
   .refine(
     (data) =>
-      data.content.trim().length > 0 || (Boolean(data.attachments) && data.attachments!.length > 0),
+      data.content.trim().length > 0 ||
+      (Boolean(data.attachments) && data.attachments!.length > 0) ||
+      Boolean(data.e2eePayload),
     {
-      message: 'Message content or at least one attachment is required',
+      message: 'Message content, attachments, or e2eePayload is required',
       path: ['content'],
     },
   );

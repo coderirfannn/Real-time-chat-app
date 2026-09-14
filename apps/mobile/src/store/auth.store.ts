@@ -4,6 +4,7 @@ import { secureStorage } from '../services/storage/secure-storage.service';
 import { authApi } from '../services/api/auth.api';
 import { apiClient } from '../services/api/client';
 import { notificationService } from '../services/notifications/notification.service';
+import { keyBundleService } from '../services/crypto/key-bundle.service';
 
 export interface AuthState {
   user: UserProfile | null;
@@ -117,7 +118,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       // Proactively register push token for authenticated restored session
+      // Proactively register push token and initialize E2EE device keys
       notificationService.registerForPushNotifications().catch(() => {});
+      keyBundleService.initializeDeviceKeys().catch(() => {});
 
       // Background validation of session to ensure freshness
       try {
@@ -154,8 +157,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isLoading: false,
     });
 
-    // Proactively register push token on successful login/signup
+    // Proactively register push token and initialize E2EE device keys on successful login/signup
     notificationService.registerForPushNotifications().catch(() => {});
+    keyBundleService.initializeDeviceKeys().catch(() => {});
   },
 
   setUser: (user: UserProfile) => {

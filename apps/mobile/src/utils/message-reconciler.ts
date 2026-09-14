@@ -1,5 +1,6 @@
 import type { IMessage } from '@chatlock/shared-types';
 import type { LocalMessage, OutboxMessage, DeliveryStatus } from '../types/chat.types';
+import { decryptedCacheService } from '../services/crypto/decrypted-cache.service';
 
 export interface ReconcileOptions {
   historyPages?: Array<{ messages?: IMessage[] } | undefined>;
@@ -83,9 +84,27 @@ export function reconcileChatMessages(options: ReconcileOptions): LocalMessage[]
     } else {
       // Merge properties with monotonic receipt status progression
       const mergedStatus = resolveHighestStatus(existing.status, msg.status);
+
+      const cachedPlaintext =
+        (msg.clientMessageId && decryptedCacheService.getSync(msg.clientMessageId)) ||
+        (msg.id && decryptedCacheService.getSync(msg.id)) ||
+        (existing.clientMessageId && decryptedCacheService.getSync(existing.clientMessageId)) ||
+        (existing.id && decryptedCacheService.getSync(existing.id));
+
+      const preservedContent =
+        cachedPlaintext ||
+        ((msg.encryptionState === 'E2EE' || msg.isEncrypted) && existing.content
+          ? existing.content
+          : msg.content);
+
       const merged: LocalMessage = {
         ...existing,
         ...msg,
+        content: preservedContent,
+        isEncrypted: msg.isEncrypted ?? existing.isEncrypted,
+        encryptionState: msg.encryptionState ?? existing.encryptionState,
+        senderDeviceId: msg.senderDeviceId ?? existing.senderDeviceId,
+        e2eePayload: msg.e2eePayload ?? existing.e2eePayload,
         // Preserve populated sender if existing had it
         sender: msg.sender || existing.sender,
         // Preserve retry payload if still needed
@@ -105,8 +124,14 @@ export function reconcileChatMessages(options: ReconcileOptions): LocalMessage[]
   for (const page of historyPages) {
     if (!page || !Array.isArray(page.messages)) continue;
     for (const rawMsg of page.messages) {
+      const cached =
+        (rawMsg.clientMessageId && decryptedCacheService.getSync(rawMsg.clientMessageId)) ||
+        (rawMsg.id && decryptedCacheService.getSync(rawMsg.id));
+
       const formatted: LocalMessage = {
         ...rawMsg,
+        content: cached || rawMsg.content,
+        isEncrypted: rawMsg.encryptionState === 'E2EE',
         clientMessageId: rawMsg.clientMessageId || `srv_${rawMsg.id}`,
         status: (rawMsg.status as DeliveryStatus) || 'sent',
       };

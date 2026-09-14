@@ -1,7 +1,13 @@
 import { Types } from 'mongoose';
 import { BaseRepository, type PaginationOptions, type PaginatedResult } from './base.repository.js';
 import { MessageModel, type IMessageDoc } from '../models/message.model.js';
-import type { MessageType, MessageAttachment, CursorPaginatedResult } from '@chatlock/shared-types';
+import type {
+  MessageType,
+  MessageAttachment,
+  CursorPaginatedResult,
+  MessageEncryptionState,
+  E2EEEncryptedPayload,
+} from '@chatlock/shared-types';
 
 const SENDER_FIELDS = '_id username displayName avatarUrl status';
 
@@ -39,6 +45,9 @@ export class MessageRepository extends BaseRepository<IMessageDoc> {
     content: string;
     attachments?: MessageAttachment[];
     replyToMessageId?: string | Types.ObjectId;
+    encryptionState?: MessageEncryptionState;
+    senderDeviceId?: string;
+    e2eePayload?: E2EEEncryptedPayload;
   }): Promise<IMessageDoc> {
     const created = await this.create({
       conversationId: new Types.ObjectId(data.conversationId),
@@ -50,6 +59,9 @@ export class MessageRepository extends BaseRepository<IMessageDoc> {
       replyToMessageId: data.replyToMessageId
         ? new Types.ObjectId(data.replyToMessageId)
         : undefined,
+      encryptionState: data.encryptionState || 'LEGACY_PLAINTEXT',
+      senderDeviceId: data.senderDeviceId,
+      e2eePayload: data.e2eePayload,
     });
 
     return (await this.findPopulatedById(created._id.toString())) || created;

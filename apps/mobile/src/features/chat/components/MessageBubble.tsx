@@ -30,6 +30,7 @@ export interface MessageBubbleProps {
   onReply?: (message: LocalMessage) => void;
   onReaction?: (messageId: string, emoji: string) => void;
   onPressReplyPreview?: (targetMessageId: string) => void;
+  onReport?: (message: LocalMessage) => void;
 }
 
 function formatFileSize(bytes: number): string {
@@ -49,6 +50,7 @@ export const MessageBubble = memo(function MessageBubble({
   onReply,
   onReaction,
   onPressReplyPreview,
+  onReport,
 }: MessageBubbleProps): React.JSX.Element {
   const [showPicker, setShowPicker] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -61,6 +63,8 @@ export const MessageBubble = memo(function MessageBubble({
 
   const timeText = formatMessageTime(message.createdAt);
   const isFailed = message.status === 'failed';
+  const isEncrypted = message.isEncrypted || message.encryptionState === 'E2EE';
+  const isDecryptionFailed = Boolean(message.content?.startsWith('🔒 Encrypted message'));
   const attachments = message.attachments || [];
 
   const handleOpenAttachment = useCallback((att: MessageAttachment) => {
@@ -170,6 +174,14 @@ export const MessageBubble = memo(function MessageBubble({
           onSelectEmoji={handleSelectEmoji}
           onReply={onReply ? handleReplyPress : undefined}
           onCopy={message.content ? handleCopyText : undefined}
+          onReport={
+            onReport
+              ? () => {
+                  setShowPicker(false);
+                  onReport(message);
+                }
+              : undefined
+          }
           onClose={() => setShowPicker(false)}
           isOutbound={isOutbound}
         />
@@ -301,13 +313,28 @@ export const MessageBubble = memo(function MessageBubble({
 
           {/* Text Content */}
           {Boolean(message.content) && (
-            <Text style={[styles.text, isOutbound ? styles.outboundText : styles.inboundText]}>
+            <Text
+              style={[
+                styles.text,
+                isOutbound ? styles.outboundText : styles.inboundText,
+                isDecryptionFailed ? styles.failedDecryptText : null,
+              ]}
+            >
               {message.content}
             </Text>
           )}
 
           {/* Timestamp & Status Metadata Row */}
           <View style={styles.metaRow}>
+            {isEncrypted && (
+              <View style={styles.lockBadge}>
+                <Icon
+                  name="lock"
+                  size={10}
+                  color={isOutbound ? 'rgba(255, 255, 255, 0.7)' : '#757B8C'}
+                />
+              </View>
+            )}
             {showTime && (
               <Text
                 style={[styles.timeText, isOutbound ? styles.outboundTime : styles.inboundTime]}
@@ -571,12 +598,21 @@ const styles = StyleSheet.create({
   inboundText: {
     color: '#FFFFFF',
   },
+  failedDecryptText: {
+    fontStyle: 'italic',
+    color: '#A0A5B5',
+  },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
     marginTop: 4,
     gap: 4,
+  },
+  lockBadge: {
+    marginRight: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   timeText: {
     fontSize: 11,

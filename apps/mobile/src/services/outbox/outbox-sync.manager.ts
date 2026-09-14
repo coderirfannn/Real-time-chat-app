@@ -128,6 +128,12 @@ export class OutboxSyncManager {
         type: message.type || 'text',
         attachments: message.attachments,
         replyToMessageId: retryPayload.replyToMessageId || message.replyToMessageId,
+        encryptionState:
+          message.encryptionState ||
+          retryPayload.encryptionState ||
+          (message.isEncrypted ? 'E2EE' : 'LEGACY_PLAINTEXT'),
+        senderDeviceId: message.senderDeviceId || retryPayload.senderDeviceId,
+        e2eePayload: message.e2eePayload || retryPayload.e2eePayload,
       });
 
       if (ack.success) {

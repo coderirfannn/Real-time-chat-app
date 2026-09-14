@@ -22,6 +22,8 @@
     "@chatlock/config": "workspace:*",
     "@chatlock/shared-types": "workspace:*",
     "@chatlock/validation": "workspace:*",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
     "@socket.io/redis-adapter": "^8.3.0",
     "bcryptjs": "^3.0.2",
     "cloudinary": "^2.11.0",

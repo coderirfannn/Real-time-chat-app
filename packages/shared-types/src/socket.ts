@@ -1,5 +1,12 @@
 import type { ID } from './common.js';
-import type { IMessage, MessageType, MessageAttachment, MessageReaction } from './chat.js';
+import type {
+  IMessage,
+  MessageType,
+  MessageAttachment,
+  MessageReaction,
+  MessageEncryptionState,
+} from './chat.js';
+import type { E2EEEncryptedPayload } from './e2ee.js';
 import type { UserStatus } from './user.js';
 import type { ReceiptStatus } from './receipt.js';
 
@@ -27,6 +34,7 @@ export enum SocketEvents {
   PRESENCE_UPDATE = 'presence:update',
   USER_PRESENCE = 'user:presence',
   USER_STATUS_CHANGE = 'user_status_change',
+  USER_WARNING = 'user:warning',
   ERROR = 'error',
 }
 
@@ -45,6 +53,9 @@ export interface SendMessagePayload {
   attachments?: MessageAttachment[];
   replyToMessageId?: ID;
   tempId?: string;
+  encryptionState?: MessageEncryptionState;
+  senderDeviceId?: string;
+  e2eePayload?: E2EEEncryptedPayload;
 }
 
 export interface MessageAckResponse {
@@ -176,6 +187,11 @@ export interface ServerToClientEvents {
     userId: ID;
     status: UserStatus;
     lastSeenAt?: string;
+  }) => void;
+  [SocketEvents.USER_WARNING]: (payload: {
+    reason: string;
+    message: string;
+    timestamp: string;
   }) => void;
   [SocketEvents.ERROR]: (error: { code: string; message: string }) => void;
 }

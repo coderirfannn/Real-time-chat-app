@@ -156,6 +156,111 @@ export async function closeSocketIO(): Promise<void> {
   }
 }
 
+import { deviceRepository } from '../repositories/device.repository.js';
+import { pushNotificationService } from '../services/push-notification.service.js';
+import { SocketEvents } from '@chatlock/shared-types';
+
+/**
+ * Forcefully disconnects all active sockets for a user when suspended or banned,
+ * sending an error frame and broadcasting offline presence.
+ */
+export async function evictUserSockets(userId: string, reason: string): Promise<number> {
+  const cleanUserId = userId.trim();
+  const socketIds = connectionManager.getUserSocketIds(cleanUserId);
+
+  if (socketIds.length === 0) {
+    socketServerLogger.debug('No active sockets to evict for user', { userId: cleanUserId });
+    return 0;
+  }
+
+  try {
+    if (ioInstance) {
+      for (const socketId of socketIds) {
+        const sock = ioInstance.sockets.sockets.get(socketId);
+        if (sock) {
+          sock.emit(SocketEvents.ERROR, {
+            code: 'ACCOUNT_STATUS_REVOKED',
+            message: reason || 'Your account access has been revoked by an administrator.',
+          });
+          sock.disconnect(true);
+        }
+      }
+
+      await presenceService
+        .setOffline(cleanUserId)
+        .then((payload) => {
+          if (ioInstance) {
+            broadcastUserPresence(ioInstance, payload);
+          }
+        })
+        .catch(() => {});
+    }
+  } catch (err) {
+    socketServerLogger.warn('Error during evictUserSockets', {
+      userId: cleanUserId,
+      error: (err as Error).message,
+    });
+  }
+
+  socketServerLogger.info('Evicted user sockets following moderation action', {
+    userId: cleanUserId,
+    evictedSocketsCount: socketIds.length,
+  });
+
+  return socketIds.length;
+}
+
+/**
+ * Dispatches a moderation warning to a user across real-time socket connection and push notifications.
+ * CRITICAL SECURITY / PRIVACY: Reporter identity and message plaintext are NEVER sent.
+ */
+export async function sendModerationWarning(
+  userId: string,
+  data: { reason: string; warningMessage?: string },
+): Promise<void> {
+  const cleanUserId = userId.trim();
+  const messageText =
+    data.warningMessage?.trim() ||
+    `Warning: Your account was reported for violating Community Guidelines regarding ${data.reason}. Further violations will lead to account suspension or ban.`;
+
+  // 1. Socket notification
+  try {
+    if (ioInstance) {
+      const userRoom = roomManager.getUserRoom(cleanUserId);
+      ioInstance.to(userRoom).emit(SocketEvents.USER_WARNING, {
+        reason: data.reason,
+        message: messageText,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  } catch (err) {
+    socketServerLogger.warn('Error emitting socket moderation warning', {
+      userId: cleanUserId,
+      error: (err as Error).message,
+    });
+  }
+
+  // 2. Offline Push notification
+  try {
+    const tokens = await deviceRepository.findActiveTokensByUser(cleanUserId);
+    if (tokens.length > 0) {
+      await pushNotificationService.sendPushNotifications(tokens, {
+        title: '⚠️ Moderation Warning',
+        body: messageText,
+        data: {
+          type: 'MODERATION_WARNING',
+          reason: data.reason,
+        },
+      });
+    }
+  } catch (err) {
+    socketServerLogger.warn('Error sending moderation warning push notification', {
+      userId: cleanUserId,
+      error: (err as Error).message,
+    });
+  }
+}
+
 export * from './connection.js';
 export * from './rooms.js';
 export * from './middleware/auth.socket.middleware.js';

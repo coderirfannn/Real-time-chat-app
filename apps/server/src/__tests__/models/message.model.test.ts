@@ -47,7 +47,7 @@ describe('Message Model Schema & Validation', () => {
   });
 
   it('fails validation when content exceeds max length', () => {
-    const hugeContent = 'a'.repeat(5001);
+    const hugeContent = 'a'.repeat(10001);
     const message = new MessageModel({
       conversationId,
       senderId,

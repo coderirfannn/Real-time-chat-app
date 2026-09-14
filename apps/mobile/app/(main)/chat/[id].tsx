@@ -24,8 +24,9 @@ import { MessageFeedSkeleton } from '../../../src/components/MessageFeedSkeleton
 import { Icon } from '../../../src/components/ui';
 import { formatLastSeenTime } from '../../../src/utils/date-formatter';
 import { brandColors } from '../../../src/theme/colors';
+import { ReportModal } from '../../../src/components/ReportModal';
 import type { ChatFeedItem } from '../../../src/types/chat.types';
-import type { MessageAttachment } from '@chatlock/shared-types';
+import type { MessageAttachment, ReportTargetType } from '@chatlock/shared-types';
 
 export default function ChatScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -59,6 +60,13 @@ export default function ChatScreen(): React.JSX.Element {
   const listRef = useRef<FlatList<ChatFeedItem>>(null);
   const [isScrolledUp, setIsScrolledUp] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{
+    targetType: ReportTargetType;
+    targetId: string;
+    reportedUserName?: string;
+    messageId?: string;
+    conversationId?: string;
+  } | null>(null);
 
   const handleBack = useCallback(() => {
     router.back();
@@ -276,6 +284,15 @@ export default function ChatScreen(): React.JSX.Element {
               onReaction={toggleReaction}
               onScrollStateChange={setIsScrolledUp}
               onQuickIcebreaker={(text) => sendMessage(text)}
+              onReportMessage={(msg) => {
+                setReportTarget({
+                  targetType: 'MESSAGE',
+                  targetId: msg.id || msg.clientMessageId,
+                  reportedUserName: displayName,
+                  messageId: msg.id,
+                  conversationId,
+                });
+              }}
             />
 
             {/* Floating Action Button (Scroll to Bottom) with Spring Motion */}
@@ -385,6 +402,23 @@ export default function ChatScreen(): React.JSX.Element {
             </TouchableOpacity>
 
             <TouchableOpacity
+              style={styles.modalActionItem}
+              onPress={() => {
+                setShowOptionsMenu(false);
+                setReportTarget({
+                  targetType: 'USER',
+                  targetId: recipient.id,
+                  reportedUserName: displayName,
+                  conversationId,
+                });
+              }}
+              activeOpacity={0.7}
+            >
+              <Icon name="alert-circle" size={18} color="#EF4444" />
+              <Text style={[styles.modalActionLabel, { color: '#EF4444' }]}>Report User</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[styles.modalActionItem, styles.modalCloseBtn]}
               onPress={() => setShowOptionsMenu(false)}
               activeOpacity={0.7}
@@ -394,6 +428,19 @@ export default function ChatScreen(): React.JSX.Element {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Report Abuse Modal */}
+      {reportTarget && (
+        <ReportModal
+          visible={Boolean(reportTarget)}
+          onClose={() => setReportTarget(null)}
+          targetType={reportTarget.targetType}
+          targetId={reportTarget.targetId}
+          reportedUserName={reportTarget.reportedUserName}
+          conversationId={reportTarget.conversationId}
+          messageId={reportTarget.messageId}
+        />
+      )}
     </View>
   );
 

@@ -10,6 +10,7 @@ import { useAuthStore } from '../../../store/auth.store';
 import { useNotificationStore } from '../../../store/notification.store';
 import { buildInvertedChatFeed } from '../../../utils/message-grouper';
 import { reconcileChatMessages, resolveHighestStatus } from '../../../utils/message-reconciler';
+import { e2eeMessageService, decryptedCacheService } from '../../../services/crypto';
 import { CONVERSATIONS_QUERY_KEY } from './useConversations';
 import type { LocalMessage, OutboxMessage, ChatFeedItem } from '../../../types/chat.types';
 import type {
@@ -20,6 +21,8 @@ import type {
   MessageAttachment,
   MessageType,
   MessageReaction,
+  MessageEncryptionState,
+  E2EEEncryptedPayload,
 } from '@chatlock/shared-types';
 
 export interface UseChatReturn {
@@ -90,12 +93,24 @@ export function useChat(conversationId: string): UseChatReturn {
     refetch: refetchHistory,
   } = useInfiniteQuery({
     queryKey: ['messages', conversationId],
-    queryFn: ({ pageParam }) =>
-      conversationApi.getMessages(conversationId, {
+    queryFn: async ({ pageParam }) => {
+      const result = await conversationApi.getMessages(conversationId, {
         cursor: pageParam,
         limit: 50,
         direction: 'before',
-      }),
+      });
+      if (result && Array.isArray(result.messages)) {
+        const decryptedMessages = await e2eeMessageService.decryptMessageList(
+          result.messages,
+          currentUserId,
+        );
+        return {
+          ...result,
+          messages: decryptedMessages,
+        };
+      }
+      return result;
+    },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) =>
       lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined,
@@ -281,7 +296,7 @@ export function useChat(conversationId: string): UseChatReturn {
 
   // 9. Socket Listeners: onNewMessage, onMessageSent, onMessageDelivered, onMessageRead
   useEffect(() => {
-    const unsubNew = socketManager.onNewMessage((newMsg: IMessage) => {
+    const unsubNew = socketManager.onNewMessage(async (newMsg: IMessage) => {
       if (newMsg.conversationId !== conversationId) return;
 
       const senderIdStr =
@@ -292,8 +307,28 @@ export function useChat(conversationId: string): UseChatReturn {
             String(newMsg.senderId || '');
 
       const isIncoming = Boolean(currentUserId && senderIdStr && senderIdStr !== currentUserId);
+
+      // Decrypt inbound E2EE message if needed
+      let displayContent = newMsg.content;
+      if (newMsg.encryptionState === 'E2EE' && newMsg.e2eePayload) {
+        displayContent = await e2eeMessageService.decryptInboundMessage({
+          messageId: newMsg.id,
+          clientMessageId: newMsg.clientMessageId,
+          senderId: newMsg.senderId,
+          senderDeviceId: newMsg.senderDeviceId,
+          content: newMsg.content,
+          e2eePayload: newMsg.e2eePayload,
+          encryptionState: newMsg.encryptionState,
+          currentUserId,
+        });
+      } else if (newMsg.clientMessageId && decryptedCacheService.hasSync(newMsg.clientMessageId)) {
+        displayContent = decryptedCacheService.getSync(newMsg.clientMessageId) || newMsg.content;
+      }
+
       const formattedMsg: LocalMessage = {
         ...newMsg,
+        content: displayContent,
+        isEncrypted: newMsg.encryptionState === 'E2EE',
         clientMessageId: newMsg.clientMessageId || `srv_${newMsg.id}`,
         status: isIncoming ? 'read' : (newMsg.status as LocalMessage['status']) || 'delivered',
       };
@@ -341,8 +376,8 @@ export function useChat(conversationId: string): UseChatReturn {
           if (cId === conversationId) {
             return {
               ...c,
-              lastMessage: newMsg,
-              lastMessageId: newMsg,
+              lastMessage: formattedMsg,
+              lastMessageId: formattedMsg,
               lastMessageAt: newMsg.createdAt,
               unreadCount: 0,
             };
@@ -471,40 +506,80 @@ export function useChat(conversationId: string): UseChatReturn {
       }
 
       const targetReplyId = replyToMessageId || replyingTo?.id;
+      const rawText = content.trim();
 
+      // Immediately cache sender's plaintext locally for 0ms retrieval
+      decryptedCacheService.setSync(clientMessageId, rawText);
+
+      // Perform E2EE encryption if direct peer is identified
+      let outboundContent = rawText;
+      let e2eePayload: E2EEEncryptedPayload | undefined;
+      let senderDeviceId: string | undefined;
+      let encryptionState: MessageEncryptionState = 'LEGACY_PLAINTEXT';
+      let isEncrypted = false;
+
+      if (recipient.id && recipient.id !== 'peer' && recipient.id !== currentUserId) {
+        try {
+          const enc = await e2eeMessageService.prepareOutboundMessage({
+            peerUserId: recipient.id,
+            plaintext: rawText,
+            clientMessageId,
+            currentUserId,
+          });
+          outboundContent = enc.ciphertext;
+          e2eePayload = enc.e2eePayload;
+          senderDeviceId = enc.senderDeviceId;
+          encryptionState = 'E2EE';
+          isEncrypted = true;
+        } catch (err) {
+          console.warn('[useChat] Failed to encrypt message, sending as legacy plaintext:', err);
+        }
+      }
+
+      const nowIso = new Date().toISOString();
       const outboxItem: OutboxMessage = {
         conversationId,
         senderId: currentUserId,
         sender: currentUser ?? undefined,
         clientMessageId,
         type: msgType,
-        content: content.trim(),
+        content: outboundContent,
         attachments: hasAttachments ? attachments : undefined,
         replyToMessageId: targetReplyId,
         status: isConnected ? 'sending' : 'pending',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        isEncrypted,
+        encryptionState,
+        senderDeviceId,
+        e2eePayload,
+        createdAt: nowIso,
+        updatedAt: nowIso,
         attempts: 0,
         retryPayload: {
           conversationId,
-          content: content.trim(),
+          content: outboundContent,
           clientMessageId,
           replyToMessageId: targetReplyId,
+          encryptionState,
+          senderDeviceId,
+          e2eePayload,
         },
       };
 
-      const nowIso = new Date().toISOString();
       const optimisticMsg: LocalMessage = {
         id: clientMessageId,
         clientMessageId,
         conversationId,
         senderId: currentUserId,
         sender: currentUser ?? undefined,
-        content: content.trim(),
+        content: rawText,
         type: msgType,
         attachments: hasAttachments ? attachments : undefined,
         replyToMessageId: targetReplyId,
         status: isConnected ? 'sending' : 'pending',
+        isEncrypted,
+        encryptionState,
+        senderDeviceId,
+        e2eePayload,
         createdAt: nowIso,
         updatedAt: nowIso,
       };

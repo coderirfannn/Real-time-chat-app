@@ -33,6 +33,7 @@ export interface MessageListProps {
   onPressReplyPreview?: (targetMessageId: string) => void;
   onScrollStateChange?: (isScrolledUp: boolean) => void;
   onQuickIcebreaker?: (text: string) => void;
+  onReportMessage?: (message: LocalMessage) => void;
 }
 
 export const MessageList = memo(
@@ -53,6 +54,7 @@ export const MessageList = memo(
       onPressReplyPreview,
       onScrollStateChange,
       onQuickIcebreaker,
+      onReportMessage,
     },
     ref,
   ): React.JSX.Element {
@@ -87,6 +89,7 @@ export const MessageList = memo(
             onReply={onReplyMessage}
             onReaction={onReaction}
             onPressReplyPreview={onPressReplyPreview}
+            onReport={onReportMessage}
           />
         );
       },
@@ -97,6 +100,7 @@ export const MessageList = memo(
         onReplyMessage,
         onReaction,
         onPressReplyPreview,
+        onReportMessage,
       ],
     );
 

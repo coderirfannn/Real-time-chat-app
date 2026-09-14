@@ -119,6 +119,9 @@ export class MessageService {
       content: payload.content || '',
       attachments: payload.attachments,
       replyToMessageId: payload.replyToMessageId,
+      encryptionState: payload.encryptionState || 'LEGACY_PLAINTEXT',
+      senderDeviceId: payload.senderDeviceId,
+      e2eePayload: payload.e2eePayload,
     });
 
     // 6. Update conversation last message & initialize receipts concurrently

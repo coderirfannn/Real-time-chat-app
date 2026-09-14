@@ -3,6 +3,8 @@ import type {
   MessageType,
   MessageAttachment,
   MessageReaction,
+  E2EEEncryptedPayload,
+  MessageEncryptionState,
 } from '@chatlock/shared-types';
 
 export type DeliveryStatus = 'pending' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
@@ -25,11 +27,18 @@ export interface OutboxMessage {
   lastAttemptAt?: string;
   lastError?: string;
   isRetryable?: boolean;
+  isEncrypted?: boolean;
+  encryptionState?: MessageEncryptionState;
+  senderDeviceId?: string;
+  e2eePayload?: E2EEEncryptedPayload;
   retryPayload: {
     conversationId: string;
     content: string;
     clientMessageId: string;
     replyToMessageId?: string;
+    encryptionState?: MessageEncryptionState;
+    senderDeviceId?: string;
+    e2eePayload?: E2EEEncryptedPayload;
   };
 }
 
@@ -51,6 +60,10 @@ export interface LocalMessage {
   deletedAt?: string | null;
   isEdited?: boolean;
   isDeleted?: boolean;
+  isEncrypted?: boolean;
+  encryptionState?: MessageEncryptionState;
+  senderDeviceId?: string;
+  e2eePayload?: E2EEEncryptedPayload;
   createdAt: string;
   updatedAt: string;
   retryPayload?: {

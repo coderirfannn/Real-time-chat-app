@@ -33,4 +33,24 @@ config.resolver.extraNodeModules = new Proxy(
   },
 );
 
+// 4. Fallback resolver for peer-navigation assets
+const originalResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName.includes('back-icon-mask.png')) {
+    try {
+      const elPath = require.resolve('@react-navigation/elements/package.json', {
+        paths: [projectRoot, monorepoRoot],
+      });
+      const assetPath = path.resolve(path.dirname(elPath), 'src/assets/back-icon-mask.png');
+      return { filePath: assetPath, type: 'sourceFile' };
+    } catch {
+      // fallback
+    }
+  }
+  if (originalResolveRequest) {
+    return originalResolveRequest(context, moduleName, platform);
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
+
 module.exports = config;

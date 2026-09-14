@@ -3,3 +3,4 @@ export * from './auth.service.js';
 export * from './conversation.service.js';
 export * from './message.service.js';
 export * from './presence.service.js';
+export * from './e2ee.service.js';

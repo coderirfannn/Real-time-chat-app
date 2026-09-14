@@ -14,6 +14,8 @@ import type {
   AdminUserQueryInput,
   AdminStatusUpdateInput,
   AdminAuditLogQueryInput,
+  AdminReportQueryInput,
+  ResolveReportInput,
 } from '@chatlock/validation';
 import { adminService, type AdminService } from '../services/admin.service.js';
 import { UnauthorizedError } from '../errors/app-error.js';
@@ -179,7 +181,38 @@ export class AdminController {
       }>
     >,
   ): Promise<void> => {
-    const data = await this.admin.listReports(req.query);
+    const data = await this.admin.listReports(req.query as AdminReportQueryInput);
+    res.status(200).json({
+      success: true,
+      data,
+      timestamp: new Date().toISOString(),
+    });
+  };
+
+  public getReportDetail = async (
+    req: Request<{ id: string }>,
+    res: Response<
+      ApiResponse<{
+        report: AdminReportItem;
+        targetUserModerationHistory: AdminAuditLogItem[];
+      }>
+    >,
+  ): Promise<void> => {
+    const context = this.extractContext(req);
+    const data = await this.admin.getReportDetail(req.params.id, context);
+    res.status(200).json({
+      success: true,
+      data,
+      timestamp: new Date().toISOString(),
+    });
+  };
+
+  public resolveReport = async (
+    req: Request<{ id: string }, unknown, ResolveReportInput>,
+    res: Response<ApiResponse<AdminReportItem>>,
+  ): Promise<void> => {
+    const context = this.extractContext(req);
+    const data = await this.admin.resolveReport(req.params.id, req.body, context);
     res.status(200).json({
       success: true,
       data,

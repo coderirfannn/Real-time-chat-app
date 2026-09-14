@@ -5,6 +5,7 @@ import { socketManager } from '../services/socket/socket.manager';
 import { outboxSyncManager } from '../services/outbox/outbox-sync.manager';
 import { networkService } from '../services/network/network.service';
 import { notificationService } from '../services/notifications/notification.service';
+import { keyBundleService } from '../services/crypto/key-bundle.service';
 
 export interface AppLifecycleOptions {
   onResume?: () => void;
@@ -53,6 +54,7 @@ function handleAppResume(): void {
   // 3. Proactively ensure device push token is fresh and registered with backend
   if (accessToken) {
     notificationService.registerForPushNotifications().catch(() => {});
+    keyBundleService.initializeDeviceKeys().catch(() => {});
   }
 }
 

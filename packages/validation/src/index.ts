@@ -4,3 +4,4 @@ export * from './user.js';
 export * from './chat.js';
 export * from './media.js';
 export * from './admin.js';
+export * from './e2ee.js';

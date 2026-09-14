@@ -3,6 +3,8 @@ import {
   adminUserQuerySchema,
   adminStatusUpdateSchema,
   adminAuditLogQuerySchema,
+  adminReportQuerySchema,
+  resolveReportSchema,
 } from '@chatlock/validation';
 import { requireAuth, requireAdmin, validate } from '../middleware/index.js';
 import { adminController } from '../controllers/admin.controller.js';
@@ -52,8 +54,18 @@ router.get(
   asyncHandler(adminController.listAuditLogs),
 );
 
-// Reports Management (Task 28 extension point)
-router.get('/reports', asyncHandler(adminController.listReports));
+// Reports Management & Abuse Moderation
+router.get(
+  '/reports',
+  validate({ query: adminReportQuerySchema }),
+  asyncHandler(adminController.listReports),
+);
+router.get('/reports/:id', asyncHandler(adminController.getReportDetail));
+router.post(
+  '/reports/:id/resolve',
+  validate({ body: resolveReportSchema }),
+  asyncHandler(adminController.resolveReport),
+);
 
 // Group Chats Moderation (Task 34 extension point)
 router.get('/groups', asyncHandler(adminController.listGroups));

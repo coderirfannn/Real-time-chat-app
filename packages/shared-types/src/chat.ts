@@ -1,5 +1,6 @@
 import type { ID, Timestamps } from './common.js';
 import type { UserProfile } from './user.js';
+import type { E2EEEncryptedPayload } from './e2ee.js';
 
 export type ConversationType = 'direct' | 'group' | 'channel';
 
@@ -8,6 +9,8 @@ export type MessageType = 'text' | 'image' | 'file' | 'audio' | 'video' | 'syste
 export type MessageDeliveryStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
 
 export type AttachmentUploadStatus = 'uploading' | 'uploaded' | 'failed';
+
+export type MessageEncryptionState = 'LEGACY_PLAINTEXT' | 'E2EE';
 
 export interface MessageReaction {
   emoji: string;
@@ -47,6 +50,9 @@ export interface IMessage extends Timestamps {
   deletedAt?: string | null;
   isEdited: boolean;
   isDeleted: boolean;
+  encryptionState?: MessageEncryptionState;
+  senderDeviceId?: string;
+  e2eePayload?: E2EEEncryptedPayload;
 }
 
 export interface IConversation extends Timestamps {

@@ -160,13 +160,17 @@ export class AdminApi {
   }
 
   /**
-   * Lists pending and resolved reports.
+   * Lists pending and resolved reports with advanced filtering.
    */
   public async getReports(
     params: {
       page?: number;
       limit?: number;
       status?: string;
+      targetType?: string;
+      reason?: string;
+      reporterId?: string;
+      reportedUserId?: string;
     } = {},
   ): Promise<AdminReportsResponse> {
     const queryParams: Record<string, string | number | undefined> = {
@@ -174,8 +178,40 @@ export class AdminApi {
       limit: params.limit || 20,
     };
     if (params.status) queryParams['status'] = params.status;
+    if (params.targetType) queryParams['targetType'] = params.targetType;
+    if (params.reason) queryParams['reason'] = params.reason;
+    if (params.reporterId) queryParams['reporterId'] = params.reporterId;
+    if (params.reportedUserId) queryParams['reportedUserId'] = params.reportedUserId;
 
     return apiClient.get<AdminReportsResponse>('/admin/reports', { params: queryParams });
+  }
+
+  /**
+   * Retrieves single report detail with target user moderation history.
+   */
+  public async getReportDetail(reportId: string): Promise<{
+    report: AdminReportItem;
+    targetUserModerationHistory: AdminAuditLogItem[];
+  }> {
+    return apiClient.get<{
+      report: AdminReportItem;
+      targetUserModerationHistory: AdminAuditLogItem[];
+    }>(`/admin/reports/${reportId}`);
+  }
+
+  /**
+   * Resolves report with action, notes, and optional warning message.
+   */
+  public async resolveReport(
+    reportId: string,
+    payload: {
+      action: 'DISMISS' | 'WARN' | 'SUSPEND' | 'BAN';
+      notes?: string;
+      adminNotes?: string;
+      warningMessage?: string;
+    },
+  ): Promise<AdminReportItem> {
+    return apiClient.post<AdminReportItem>(`/admin/reports/${reportId}/resolve`, payload);
   }
 
   /**

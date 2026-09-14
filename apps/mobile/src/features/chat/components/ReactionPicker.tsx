@@ -16,6 +16,7 @@ export interface ReactionPickerProps {
   onSelectEmoji: (emoji: string) => void;
   onReply?: () => void;
   onCopy?: () => void;
+  onReport?: () => void;
   onClose?: () => void;
   isOutbound?: boolean;
 }
@@ -24,6 +25,7 @@ export const ReactionPicker = memo(function ReactionPicker({
   onSelectEmoji,
   onReply,
   onCopy,
+  onReport,
   isOutbound = false,
 }: ReactionPickerProps): React.JSX.Element {
   const enterAnim = useRef(new Animated.Value(0)).current;
@@ -74,7 +76,7 @@ export const ReactionPicker = memo(function ReactionPicker({
         </ScrollView>
 
         {/* Action buttons row */}
-        {(Boolean(onReply) || Boolean(onCopy)) && (
+        {(Boolean(onReply) || Boolean(onCopy) || Boolean(onReport)) && (
           <View style={styles.actionsRow}>
             {Boolean(onReply) && (
               <TouchableOpacity
@@ -97,6 +99,18 @@ export const ReactionPicker = memo(function ReactionPicker({
               >
                 <Icon name="copy" size={13} color="#A0A5B5" />
                 <Text style={styles.actionText}>Copy</Text>
+              </TouchableOpacity>
+            )}
+
+            {Boolean(onReport) && (
+              <TouchableOpacity
+                onPress={onReport}
+                style={styles.actionBtn}
+                activeOpacity={0.7}
+                accessibilityLabel="Report this message"
+              >
+                <Icon name="alert-circle" size={13} color="#EF4444" />
+                <Text style={[styles.actionText, { color: '#EF4444' }]}>Report</Text>
               </TouchableOpacity>
             )}
           </View>

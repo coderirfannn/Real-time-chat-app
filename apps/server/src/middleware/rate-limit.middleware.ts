@@ -28,6 +28,33 @@ export const authRateLimiter = rateLimit({
 });
 
 /**
+ * Abuse prevention rate limiter for user report submissions.
+ * Limits users to 10 reports per 15 minutes to prevent report spam / denial-of-service.
+ */
+export const reportRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => {
+    return req.user?.id || req.ip || 'anonymous';
+  },
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new RateLimitExceededError(
+        'Too many reports submitted in a short period. Please try again later.',
+        {
+          retryAfterSeconds: 900,
+        },
+      ),
+    );
+  },
+  skip: () => {
+    return process.env['NODE_ENV'] === 'test';
+  },
+});
+
+/**
  * General API rate limiter.
  */
 export function createGeneralRateLimiter() {

@@ -9,8 +9,14 @@ import type {
   AdminGroupItem,
   AdminMediaItem,
   AdminSettingsData,
+  ReportStatus,
+  ResolveReportPayload,
 } from '@chatlock/shared-types';
-import type { AdminUserQueryInput, AdminAuditLogQueryInput } from '@chatlock/validation';
+import type {
+  AdminUserQueryInput,
+  AdminAuditLogQueryInput,
+  AdminReportQueryInput,
+} from '@chatlock/validation';
 import { userRepository, type UserRepository } from '../repositories/user.repository.js';
 import { sessionRepository, type SessionRepository } from '../repositories/session.repository.js';
 import { deviceRepository, type DeviceRepository } from '../repositories/device.repository.js';
@@ -22,6 +28,7 @@ import { reportRepository, type ReportRepository } from '../repositories/report.
 import { ConversationModel } from '../models/conversation.model.js';
 import { MessageModel } from '../models/message.model.js';
 import { BadRequestError, NotFoundError } from '../errors/app-error.js';
+import { evictUserSockets, sendModerationWarning } from '../socket/index.js';
 import { logger } from '../utils/logger.js';
 
 const adminLogger = logger.child('AdminService');
@@ -276,6 +283,7 @@ export class AdminService {
     // Invalidate all active sessions across all devices
     await this.sessionRepo.revokeAllUserSessions(cleanId);
     await this.userRepo.updateStatus(cleanId, 'offline');
+    await evictUserSockets(cleanId, reason || 'Account suspended by administrator');
 
     await this.auditRepo.recordLog({
       adminUserId: context.adminUserId,
@@ -399,6 +407,7 @@ export class AdminService {
     // Invalidate all active sessions
     await this.sessionRepo.revokeAllUserSessions(cleanId);
     await this.userRepo.updateStatus(cleanId, 'offline');
+    await evictUserSockets(cleanId, reason || 'Account permanently banned by administrator');
 
     await this.auditRepo.recordLog({
       adminUserId: context.adminUserId,
@@ -546,9 +555,9 @@ export class AdminService {
   }
 
   /**
-   * Reports listing (Task 28 extension point).
+   * Reports listing with full filtering, populated actors, and pagination.
    */
-  public async listReports(options: { page?: number; limit?: number; status?: string }): Promise<{
+  public async listReports(options: AdminReportQueryInput): Promise<{
     reports: AdminReportItem[];
     pagination: {
       total: number;
@@ -566,22 +575,58 @@ export class AdminService {
       page,
       limit,
       status: options.status,
+      targetType: options.targetType,
+      reason: options.reason,
+      reporterId: options.reporterId,
+      reportedUserId: options.reportedUserId,
     });
 
-    const reports: AdminReportItem[] = result.docs.map((doc) => ({
-      id: doc.id,
-      reporterId: doc.reporterId.toString(),
-      reportedUserId: doc.reportedUserId.toString(),
-      targetType: doc.targetType,
-      targetId: doc.targetId,
-      reason: doc.reason,
-      details: doc.details,
-      status: doc.status,
-      resolutionNotes: doc.resolutionNotes,
-      resolvedBy: doc.resolvedBy ? doc.resolvedBy.toString() : undefined,
-      createdAt: doc.createdAt.toISOString(),
-      updatedAt: doc.updatedAt.toISOString(),
-    }));
+    const reports: AdminReportItem[] = result.docs.map((doc) => {
+      const rep =
+        doc.reporterId && typeof doc.reporterId === 'object' && 'username' in doc.reporterId
+          ? (doc.reporterId as Record<string, unknown>)
+          : null;
+      const repUser =
+        doc.reportedUserId &&
+        typeof doc.reportedUserId === 'object' &&
+        'username' in doc.reportedUserId
+          ? (doc.reportedUserId as Record<string, unknown>)
+          : null;
+      const resAdmin =
+        doc.resolvedBy && typeof doc.resolvedBy === 'object' && 'username' in doc.resolvedBy
+          ? (doc.resolvedBy as Record<string, unknown>)
+          : null;
+
+      return {
+        id: doc.id,
+        reporterId: (rep?.['_id']?.toString() ||
+          rep?.['id'] ||
+          doc.reporterId?.toString()) as string,
+        reporterUsername: rep?.['username'] as string | undefined,
+        reporterDisplayName: rep?.['name'] as string | undefined,
+        reportedUserId: (repUser?.['_id']?.toString() ||
+          repUser?.['id'] ||
+          doc.reportedUserId?.toString()) as string,
+        reportedUsername: repUser?.['username'] as string | undefined,
+        reportedDisplayName: repUser?.['name'] as string | undefined,
+        targetType: doc.targetType,
+        targetId: doc.targetId,
+        messageId: doc.messageId?.toString(),
+        conversationId: doc.conversationId?.toString(),
+        reason: doc.reason,
+        description: doc.description,
+        details: doc.description,
+        status: doc.status,
+        resolutionAction: doc.resolutionAction,
+        resolutionNotes: doc.resolutionNotes,
+        resolvedBy: (resAdmin?.['_id']?.toString() ||
+          resAdmin?.['id'] ||
+          (doc.resolvedBy ? doc.resolvedBy.toString() : undefined)) as string | undefined,
+        resolvedAt: doc.resolvedAt ? doc.resolvedAt.toISOString() : undefined,
+        createdAt: doc.createdAt.toISOString(),
+        updatedAt: doc.updatedAt.toISOString(),
+      };
+    });
 
     return {
       reports,
@@ -593,6 +638,264 @@ export class AdminService {
         hasNextPage: result.hasNextPage,
         hasPrevPage: result.hasPrevPage,
       },
+    };
+  }
+
+  /**
+   * Retrieves single report detail populated with actor information and target user moderation history.
+   */
+  public async getReportDetail(
+    reportId: string,
+    context: AdminActionContext,
+  ): Promise<{
+    report: AdminReportItem;
+    targetUserModerationHistory: AdminAuditLogItem[];
+  }> {
+    const cleanId = reportId.trim();
+    if (!Types.ObjectId.isValid(cleanId)) {
+      throw new BadRequestError('Invalid report ID format');
+    }
+
+    const doc = await this.repRepo.findReportByIdPopulated(cleanId);
+    if (!doc) {
+      throw new NotFoundError('Report not found');
+    }
+
+    const rep =
+      doc.reporterId && typeof doc.reporterId === 'object' && 'username' in doc.reporterId
+        ? (doc.reporterId as Record<string, unknown>)
+        : null;
+    const repUser =
+      doc.reportedUserId &&
+      typeof doc.reportedUserId === 'object' &&
+      'username' in doc.reportedUserId
+        ? (doc.reportedUserId as Record<string, unknown>)
+        : null;
+    const resAdmin =
+      doc.resolvedBy && typeof doc.resolvedBy === 'object' && 'username' in doc.resolvedBy
+        ? (doc.resolvedBy as Record<string, unknown>)
+        : null;
+
+    const reportedUserIdStr = (repUser?.['_id']?.toString() ||
+      repUser?.['id'] ||
+      doc.reportedUserId?.toString()) as string;
+
+    const rawHistory = await this.auditRepo.findByTarget(reportedUserIdStr, 10);
+    const targetUserModerationHistory: AdminAuditLogItem[] = rawHistory.map((h) => ({
+      id: h.id,
+      adminUserId: h.adminUserId.toString(),
+      adminUsername: h.adminUsername,
+      action: h.action,
+      targetId: h.targetId,
+      targetType: h.targetType,
+      ipAddress: h.ipAddress,
+      userAgent: h.userAgent,
+      requestId: h.requestId,
+      metadata: h.metadata,
+      createdAt: h.createdAt.toISOString(),
+    }));
+
+    await this.auditRepo.recordLog({
+      adminUserId: context.adminUserId,
+      adminUsername: context.adminUsername,
+      action: 'REPORT_VIEWED',
+      targetId: cleanId,
+      targetType: 'REPORT',
+      ipAddress: context.ip,
+      userAgent: context.userAgent,
+      requestId: context.requestId,
+      metadata: { targetType: doc.targetType, targetId: doc.targetId },
+    });
+
+    const report: AdminReportItem = {
+      id: doc.id,
+      reporterId: (rep?.['_id']?.toString() || rep?.['id'] || doc.reporterId?.toString()) as string,
+      reporterUsername: rep?.['username'] as string | undefined,
+      reporterDisplayName: rep?.['name'] as string | undefined,
+      reportedUserId: reportedUserIdStr,
+      reportedUsername: repUser?.['username'] as string | undefined,
+      reportedDisplayName: repUser?.['name'] as string | undefined,
+      targetType: doc.targetType,
+      targetId: doc.targetId,
+      messageId: doc.messageId?.toString(),
+      conversationId: doc.conversationId?.toString(),
+      reason: doc.reason,
+      description: doc.description,
+      details: doc.description,
+      status: doc.status,
+      resolutionAction: doc.resolutionAction,
+      resolutionNotes: doc.resolutionNotes,
+      resolvedBy: (resAdmin?.['_id']?.toString() ||
+        resAdmin?.['id'] ||
+        (doc.resolvedBy ? doc.resolvedBy.toString() : undefined)) as string | undefined,
+      resolvedAt: doc.resolvedAt ? doc.resolvedAt.toISOString() : undefined,
+      createdAt: doc.createdAt.toISOString(),
+      updatedAt: doc.updatedAt.toISOString(),
+    };
+
+    return {
+      report,
+      targetUserModerationHistory,
+    };
+  }
+
+  /**
+   * Resolves a report by executing a moderation action:
+   * - DISMISS: marks as DISMISSED
+   * - WARN: marks as WARNED, sends warning to reported user without exposing reporter
+   * - SUSPEND: marks as SUSPENDED, suspends user account, revokes sessions, evicts sockets
+   * - BAN: marks as BANNED, bans user account, revokes sessions, evicts sockets
+   */
+  public async resolveReport(
+    reportId: string,
+    payload: ResolveReportPayload & { adminNotes?: string },
+    context: AdminActionContext,
+  ): Promise<AdminReportItem> {
+    const cleanId = reportId.trim();
+    if (!Types.ObjectId.isValid(cleanId)) {
+      throw new BadRequestError('Invalid report ID format');
+    }
+
+    const report = await this.repRepo.findReportByIdPopulated(cleanId);
+    if (!report) {
+      throw new NotFoundError('Report not found');
+    }
+
+    const reportedUserId = (
+      report.reportedUserId &&
+      typeof report.reportedUserId === 'object' &&
+      '_id' in (report.reportedUserId as unknown as Record<string, unknown>)
+        ? (report.reportedUserId as unknown as { _id: { toString(): string } })._id.toString()
+        : report.reportedUserId.toString()
+    ) as string;
+
+    const action = payload.action;
+    const notes = payload.notes || payload.adminNotes || '';
+    const warningMessage = payload.warningMessage;
+
+    let targetStatus: ReportStatus;
+
+    switch (action) {
+      case 'DISMISS':
+        targetStatus = 'DISMISSED';
+        break;
+
+      case 'WARN':
+        targetStatus = 'WARNED';
+        await sendModerationWarning(reportedUserId, {
+          reason: report.reason,
+          warningMessage,
+        });
+        break;
+
+      case 'SUSPEND':
+        targetStatus = 'SUSPENDED';
+        await this.userRepo.updateAccountStatus(reportedUserId, 'SUSPENDED');
+        await this.sessionRepo.revokeAllUserSessions(reportedUserId);
+        await this.userRepo.updateStatus(reportedUserId, 'offline');
+        await evictUserSockets(reportedUserId, notes || 'Account suspended for rule violations');
+        break;
+
+      case 'BAN':
+        targetStatus = 'BANNED';
+        await this.userRepo.updateAccountStatus(reportedUserId, 'BANNED');
+        await this.sessionRepo.revokeAllUserSessions(reportedUserId);
+        await this.userRepo.updateStatus(reportedUserId, 'offline');
+        await evictUserSockets(
+          reportedUserId,
+          notes || 'Account permanently banned for severe rule violations',
+        );
+        break;
+
+      default:
+        throw new BadRequestError(`Invalid moderation action: ${action}`);
+    }
+
+    const resolvedDoc = await this.repRepo.resolveReport(cleanId, {
+      status: targetStatus,
+      resolutionAction: action,
+      resolutionNotes: notes,
+      resolvedBy: context.adminUserId,
+      resolvedAt: new Date(),
+    });
+
+    if (!resolvedDoc) {
+      throw new NotFoundError('Failed to update report');
+    }
+
+    await this.auditRepo.recordLog({
+      adminUserId: context.adminUserId,
+      adminUsername: context.adminUsername,
+      action: `REPORT_${action}`,
+      targetId: cleanId,
+      targetType: 'REPORT',
+      ipAddress: context.ip,
+      userAgent: context.userAgent,
+      requestId: context.requestId,
+      metadata: {
+        action,
+        reportedUserId,
+        targetType: report.targetType,
+        targetId: report.targetId,
+        notes,
+      },
+    });
+
+    adminLogger.info('Report resolved by admin', {
+      reportId: cleanId,
+      adminUserId: context.adminUserId,
+      action,
+      reportedUserId,
+    });
+
+    const rep =
+      resolvedDoc.reporterId &&
+      typeof resolvedDoc.reporterId === 'object' &&
+      'username' in resolvedDoc.reporterId
+        ? (resolvedDoc.reporterId as Record<string, unknown>)
+        : null;
+    const repUser =
+      resolvedDoc.reportedUserId &&
+      typeof resolvedDoc.reportedUserId === 'object' &&
+      'username' in resolvedDoc.reportedUserId
+        ? (resolvedDoc.reportedUserId as Record<string, unknown>)
+        : null;
+    const resAdmin =
+      resolvedDoc.resolvedBy &&
+      typeof resolvedDoc.resolvedBy === 'object' &&
+      'username' in resolvedDoc.resolvedBy
+        ? (resolvedDoc.resolvedBy as Record<string, unknown>)
+        : null;
+
+    return {
+      id: resolvedDoc.id,
+      reporterId: (rep?.['_id']?.toString() ||
+        rep?.['id'] ||
+        resolvedDoc.reporterId?.toString()) as string,
+      reporterUsername: rep?.['username'] as string | undefined,
+      reporterDisplayName: rep?.['name'] as string | undefined,
+      reportedUserId: (repUser?.['_id']?.toString() ||
+        repUser?.['id'] ||
+        resolvedDoc.reportedUserId?.toString()) as string,
+      reportedUsername: repUser?.['username'] as string | undefined,
+      reportedDisplayName: repUser?.['name'] as string | undefined,
+      targetType: resolvedDoc.targetType,
+      targetId: resolvedDoc.targetId,
+      messageId: resolvedDoc.messageId?.toString(),
+      conversationId: resolvedDoc.conversationId?.toString(),
+      reason: resolvedDoc.reason,
+      description: resolvedDoc.description,
+      details: resolvedDoc.description,
+      status: resolvedDoc.status,
+      resolutionAction: resolvedDoc.resolutionAction,
+      resolutionNotes: resolvedDoc.resolutionNotes,
+      resolvedBy: (resAdmin?.['_id']?.toString() ||
+        resAdmin?.['id'] ||
+        (resolvedDoc.resolvedBy ? resolvedDoc.resolvedBy.toString() : undefined)) as
+        string | undefined,
+      resolvedAt: resolvedDoc.resolvedAt ? resolvedDoc.resolvedAt.toISOString() : undefined,
+      createdAt: resolvedDoc.createdAt.toISOString(),
+      updatedAt: resolvedDoc.updatedAt.toISOString(),
     };
   }
 

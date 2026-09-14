@@ -97,11 +97,14 @@ export function registerMessageEvents(
         const recipientIds = (result.participantIds || []).filter((pid) => pid !== senderId);
         if (recipientIds.length > 0) {
           const senderDisplayName = socket.data.user.username || 'ChatLock';
-          const notificationBody =
-            validPayload.content?.trim() ||
-            (validPayload.attachments && validPayload.attachments.length > 0
-              ? 'Sent an attachment'
-              : 'Sent a message');
+          const isE2EE =
+            validPayload.encryptionState === 'E2EE' || Boolean(validPayload.e2eePayload);
+          const notificationBody = isE2EE
+            ? '🔒 New encrypted message'
+            : validPayload.content?.trim() ||
+              (validPayload.attachments && validPayload.attachments.length > 0
+                ? 'Sent an attachment'
+                : 'Sent a message');
 
           // Concurrently fetch active device tokens and calculate total unread badge count for each recipient
           Promise.all(
