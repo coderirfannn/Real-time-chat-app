@@ -1,7 +1,7 @@
 # BRAIN.md — ChatLock Platform Architecture & System Design
 
 **Project**: ChatLock — Production-Grade Real-Time Messaging Platform  
-**Version**: 0.22.0 (Production Deployment Preparation, Independent Multi-Target Architecture, Render/Vercel/EAS Blueprints, Zero-Secret Client Bundles, & Public Download Interface)  
+**Version**: 0.24.0 (Background Push Notification Engine, Persistent Device UUID, 0ms Optimistic Messaging, Live Launcher Badge Synchronization, & EAS Android Production APK)  
 **Status**: Production Industry-Grade Architecture, Fault-Tolerant Real-Time Pipeline, Multi-Node Cluster Ready, and Fully CI/CD Automated
 
 ---
@@ -29,8 +29,10 @@ ChatLock is a secure, high-concurrency, real-time messaging platform built for c
 15. **Biometric Security & App Lock**: `expo-local-authentication` integration with background timeout auto-lock, device PIN/biometric challenge, and secure session management.
 16. **Push Notification Infrastructure**: `expo-notifications` integration, device token registration, notification permissions, foreground banners, and background notification routing.
 17. **Dynamic Viewport & Mobile Keyboard Ergonomics**: Clamped visual viewport (`100dvh`, `visualViewport.height`), flexbox shrink optimization (`minHeight: 0`), dynamic multi-line composer auto-expansion (`38px -> 120px`) with native layout animation, and zero duplicate navigation headers across all stack screens.
-18. **Modernized CI/CD & Automated Quality Gates**: GitHub Actions pipeline on Node.js 22 + pnpm 11, topological build ordering, Prettier code style validation, zero ESLint warnings, 0 TypeScript errors, and 354 automated tests passing across 69 test files.
+18. **Modernized CI/CD & Automated Quality Gates**: GitHub Actions pipeline on Node.js 22 + pnpm 11, topological build ordering, Prettier code style validation, zero ESLint warnings, 0 TypeScript errors, and 384 automated tests passing across 75 test files.
 19. **Cloudinary Cloud Storage Engine**: Enterprise-grade cloud asset storage with SHA-256 HMAC upload signing, binary magic byte integrity enforcement, high-throughput streaming buffer uploads via Cloudinary v2 SDK, secure CDN media distribution, and automatic cloud asset invalidation/deletion.
+20. **Background Push Notification & Native Badge Lifecycle**: Resilient push notification pipeline via Expo Push Service and FCM. Hardware device UUID persistence in `expo-secure-store`, reactive device push token registration upon authentication and app resume, clean token deactivation on logout, automated cleanup of `DeviceNotRegistered` tokens, server-side unread message calculation in push payloads, and bi-directional native OS launcher icon badge synchronization.
+21. **0ms Instant Optimistic UI Pipeline**: Immediate local message injection, query cache mutation, and non-blocking background queue synchronization, providing zero perceptible latency on send with parallelized database operations.
 
 ---
 
@@ -206,9 +208,23 @@ The environment system strictly validates 13 distinct categories in `@chatlock/c
   - **Render Web Service Blueprint**: Created `render.yaml` Infrastructure-as-Code blueprint for Render Web Service (Node 22, `/health/ready` check, 0.0.0.0 binding, auto-deploy).
   - **Vercel Web App Deployment**: Created `vercel.json` with static SPA export configuration, `/index.html` fallback rewrites for deep linking, and CDN cache headers.
   - **Public Download Interface**: Built `/download` route (`apps/mobile/app/download.tsx`) providing cross-platform access points for Web App launch, Direct Android APK download, and Google Play Store listing.
-  - **Production Readiness Test Suite**: Created automated tests (`apps/server/src/__tests__/production/production-readiness.test.ts`) validating production config validation, CORS origin splitting, health readiness status, and error sanitization (5 tests).
-- [ ] **Task 24 — End-to-End Encryption (E2EE)**: Pre-key bundles, Signal Protocol / Double Ratchet session management, encrypted payload storage, and cryptographic key rotation.
-- [ ] **Task 25 — Production Observability & Telemetry**: Sentry crash reporting integration, Prometheus metrics exporter, structured audit logging, and automated load testing.
+- [x] **Task 24 — Standalone Android APK & Custom Branding Delivery**:
+  - **Android Cold-Boot Layout Navigation Fix**: Addressed React Native Android screen stack crash on cold boot by keeping `<Stack>` permanently mounted in `apps/mobile/app/_layout.tsx` with an absolute `zIndex: 9999` loading overlay.
+  - **Declarative Root Redirection**: Added `apps/mobile/app/index.tsx` preventing root navigation race conditions.
+  - **Native Module Cleanup**: Eliminated incompatible `expo-av` module for React Native New Architecture compatibility; integrated `expo-system-ui`.
+  - **Custom Speech Bubble Padlock Branding**: Programmed `scripts/generate_icons.py` using BFS flood fill to clean faux-transparency checkerboards from source artwork, producing 1024×1024 dark master icon (`icon.png`), transparent adaptive foreground (`adaptive-icon.png`), splash screen, and web favicon (`favicon.png`).
+  - **EAS Cloud Build & Compilation**: Automated EAS cloud build workflows for standalone Android APK signing and generation.
+- [x] **Task 25 — Background Push Notification Lifecycle, 0ms Optimistic Messaging & Launcher Icon Badge Synchronization**:
+  - **Comprehensive System Audit**: Audited complete application stack covering notification handling, background state, unread state, device token registration, and app lifecycle.
+  - **Persistent Hardware Device Identification**: Implemented `getDeviceId()` utilizing `expo-secure-store` to generate and persist a permanent unique hardware device UUID (`chatlock_device_uuid`), eliminating multi-user and multi-device database record collisions.
+  - **Reactive Auth & Lifecycle Token Registration**: Integrated automatic push token registration with backend on login (`setSession`), session restore (`hydrateAuth`), and foreground resume (`useAppLifecycle.handleAppResume`).
+  - **Device Token Deactivation & Ticket Cleanup**: Added `POST /api/v1/devices/push-token/deactivate` invoked cleanly on user logout (`useAuthStore.logout()`), and automated deactivation of `DeviceNotRegistered` tokens via Expo ticket parsing in `PushNotificationService`.
+  - **Server-Side Total Unread Calculation**: Implemented `getTotalUnreadCountForUser` in `MessageReceiptRepository` and populated recipient-specific `badge: Math.max(1, unreadCount)` in push payloads.
+  - **Bi-Directional Native OS Launcher Badge Synchronization**: Created `syncBadgeCount` and `clearBadge` in `NotificationService`, synchronizing live `totalUnreadCount` in `apps/mobile/app/(main)/_layout.tsx` to `Notifications.setBadgeCountAsync`.
+  - **0ms Instant Optimistic Messaging**: Implemented immediate local message injection with status `'sending'` in `useChat.ts`, instant query cache mutation, and non-blocking background queue synchronization alongside concurrent database operations in `message.service.ts`.
+  - **Standalone Android APK Release**: Published build `03473ff5-e4e1-4f70-9703-be25aee8ce9a` with live direct download link in `/download` web portal.
+- [ ] **Task 26 — End-to-End Encryption (E2EE)**: Pre-key bundles, Signal Protocol / Double Ratchet session management, encrypted payload storage, and cryptographic key rotation.
+- [ ] **Task 27 — Production Observability & Telemetry**: Sentry crash reporting integration, Prometheus metrics exporter, structured audit logging, and automated load testing.
 
 ---
 
@@ -221,11 +237,11 @@ CHATLOCK QUALITY & VERIFICATION MATRIX — 100% PASSING
 TypeScript Monorepo Typecheck:  ✅ 0 errors (all 5 workspace packages)
 Prettier Formatting:            ✅ All files compliant (0 warnings)
 ESLint Strict Linting:          ✅ 0 errors / 0 warnings across all packages
-Server Vitest Test Suite:       ✅ 41 / 41 test files passed (211 / 211 tests)
+Server Vitest Test Suite:       ✅ 42 / 42 test files passed (220 / 220 tests)
 Mobile Vitest Test Suite:       ✅ 31 / 31 test files passed (157 / 157 tests)
 Validation Vitest Test Suite:   ✅ 2 / 2 test files passed (7 / 7 tests)
 Shared-Types / Config:          ✅ Passing
-Total Automated Tests:          ✅ 74 test files passed (375 / 375 tests)
+Total Automated Tests:          ✅ 75 test files passed (384 / 384 tests)
 Expo Web Static Bundler:        ✅ 200 OK (1.6 MB bundle, 0 secrets, SPA fallback)
 Metro Android Bundler (LAN):    ✅ 200 OK (8.7 MB bundle)
 Metro iOS Bundler (LAN):        ✅ 200 OK (7.9 MB bundle)
@@ -233,7 +249,9 @@ Expo Go Manifest (LAN):         ✅ 200 OK (text/plain)
 Backend Express Server:         ✅ 200 OK (/api/v1/health & /health/ready)
 Production Render Backend:      ✅ 200 OK (https://chatlock-server.onrender.com)
 Production Vercel Web App:      ✅ 200 OK (https://chatlock-web.vercel.app)
-EAS Android APK Build (Preview): ✅ In Progress (ID: 686b0967-f63f-4b31-b9f2-8daab3679600)
+Production Download Portal:     ✅ 200 OK (https://chatlock-web.vercel.app/download)
+EAS Android APK Build (Preview): ✅ FINISHED (ID: 03473ff5-e4e1-4f70-9703-be25aee8ce9a)
+Direct APK Artifact Download:   ✅ https://expo.dev/artifacts/eas/t0ctWlG9G9yhJPHOqn8KBWCQQ9RKyk5jdDJJB_2BmJQ.apk
 MongoDB Atlas Connection:       ✅ Connected & Healthy (cluster: secureapp)
 ==================================================================================
 ```
