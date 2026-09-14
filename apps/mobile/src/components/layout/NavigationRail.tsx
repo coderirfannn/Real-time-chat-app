@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { useRouter } from 'expo-router';
 import { brandColors } from '../../theme/colors';
 import { Avatar } from '../Avatar';
 import { Badge } from '../Badge';
@@ -26,6 +27,7 @@ export function NavigationRail({
   unreadCount = 0,
 }: NavigationRailProps): React.JSX.Element {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const router = useRouter();
   const currentUser = useAuthStore((state) => state.user);
 
   const tabs: Array<{ key: MainTabKey; label: string; icon: IconName; badgeCount?: number }> = [
@@ -115,6 +117,28 @@ export function NavigationRail({
             </TouchableOpacity>
           );
         })}
+
+        {/* Web Admin Portal Link (Only visible on web for ADMIN role) */}
+        {Platform.OS === 'web' && currentUser?.role === 'ADMIN' && (
+          <TouchableOpacity
+            style={[styles.navItem, styles.adminNavItem, isCollapsed && styles.navItemCollapsed]}
+            onPress={() => router.push('/admin/dashboard' as never)}
+            activeOpacity={0.8}
+            accessibilityLabel="Admin Control Center"
+          >
+            <View style={styles.navIconContainer}>
+              <Icon name="shield" size={20} color="#246BFD" />
+            </View>
+            {!isCollapsed && (
+              <View style={styles.navLabelRow}>
+                <Text style={[styles.navLabel, styles.adminNavLabel]}>Admin Portal</Text>
+                <View style={styles.adminBadge}>
+                  <Text style={styles.adminBadgeText}>ADMIN</Text>
+                </View>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* User Profile Footer */}
@@ -280,5 +304,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#757B8C',
     marginTop: 1,
+  },
+  adminNavItem: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#1D3B7A',
+    backgroundColor: '#15213D',
+  },
+  adminNavLabel: {
+    color: '#8AB4F8',
+    fontWeight: '700',
+  },
+  adminBadge: {
+    backgroundColor: '#246BFD',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+  },
+  adminBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
   },
 });

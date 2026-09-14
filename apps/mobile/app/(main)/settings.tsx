@@ -277,6 +277,31 @@ export default function SettingsScreen(): React.JSX.Element {
             </View>
           )}
 
+          {/* Admin Control Center Entry (Web Only for ADMIN role) */}
+          {Platform.OS === 'web' && currentUser?.role === 'ADMIN' && (
+            <TouchableOpacity
+              style={styles.adminBanner}
+              onPress={() => router.push('/admin/dashboard' as never)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.adminBannerIconWrapper}>
+                <Icon name="shield" size={24} color="#246BFD" />
+              </View>
+              <View style={styles.adminBannerContent}>
+                <View style={styles.adminBadgeRow}>
+                  <Text style={styles.adminBannerTitle}>Control Center</Text>
+                  <View style={styles.adminBadgePill}>
+                    <Text style={styles.adminBadgePillText}>ADMIN</Text>
+                  </View>
+                </View>
+                <Text style={styles.adminBannerSubtitle}>
+                  Open administrative management, live metrics & moderation
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={20} color="#246BFD" />
+            </TouchableOpacity>
+          )}
+
           {/* Section 1: User Profile Card */}
           <Card style={styles.sectionCard} padding="lg">
             <View style={styles.profileHeader}>
@@ -796,5 +821,53 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 10,
     marginTop: 10,
+  },
+  adminBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#15213D',
+    borderWidth: 1,
+    borderColor: '#1D3B7A',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+  },
+  adminBannerIconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1D2A44',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adminBannerContent: {
+    flex: 1,
+  },
+  adminBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  adminBannerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  adminBadgePill: {
+    backgroundColor: '#246BFD',
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  adminBadgePillText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  adminBannerSubtitle: {
+    fontSize: 12,
+    color: '#8AB4F8',
+    marginTop: 2,
   },
 });

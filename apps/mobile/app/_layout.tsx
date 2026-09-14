@@ -22,7 +22,7 @@ const queryClient = new QueryClient({
 });
 
 function AuthLifecycleManager({ children }: { children: React.ReactNode }) {
-  const { accessToken, isAuthenticated, isLoading, hydrateAuth } = useAuthStore();
+  const { accessToken, isAuthenticated, isLoading, hydrateAuth, user } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
   const [isLocked, setIsLocked] = React.useState(false);
@@ -74,9 +74,13 @@ function AuthLifecycleManager({ children }: { children: React.ReactNode }) {
     if (!isAuthenticated && !inAuthGroup) {
       router.replace('/(auth)/login' as never);
     } else if (isAuthenticated && inAuthGroup) {
-      router.replace('/(main)' as never);
+      if (Platform.OS === 'web' && user?.role === 'ADMIN') {
+        router.replace('/admin/dashboard' as never);
+      } else {
+        router.replace('/(main)' as never);
+      }
     }
-  }, [isAuthenticated, isLoading, segments, router]);
+  }, [isAuthenticated, isLoading, segments, router, user]);
 
   useEffect(() => {
     if (isAuthenticated && accessToken) {

@@ -47,7 +47,11 @@ export default function LoginScreen(): React.JSX.Element {
       });
 
       await setSession(response);
-      router.replace('/(main)' as never);
+      if (Platform.OS === 'web' && response.user.role === 'ADMIN') {
+        router.replace('/admin/dashboard' as never);
+      } else {
+        router.replace('/(main)' as never);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Invalid credentials. Please try again.';
       setErrorMessage(msg);

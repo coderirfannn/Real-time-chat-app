@@ -95,3 +95,17 @@ vi.mock('expo-notifications', () => ({
     MIN: 1,
   },
 }));
+
+vi.mock('expo-router', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+  }),
+  usePathname: () => '/',
+  useSegments: () => [],
+  Link: ({ children }: { children: unknown }) => children,
+  Redirect: () => null,
+  Slot: () => null,
+  Stack: Object.assign(() => null, { Screen: () => null }),
+}));
