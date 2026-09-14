@@ -1,4 +1,5 @@
 import { useNotificationStore } from '../../store/notification.store';
+import { secureStorage } from '../storage/secure-storage.service';
 
 export interface IncomingMessageNotificationPayload {
   conversationId: string;
@@ -31,6 +32,7 @@ interface WebAudioContext {
 export class WebNotificationService {
   private static instance: WebNotificationService | null = null;
   private isInitialized = false;
+  private deviceId: string | null = null;
 
   private constructor() {}
 
@@ -47,6 +49,77 @@ export class WebNotificationService {
 
   public getIsInitialized(): boolean {
     return this.isInitialized;
+  }
+
+  public getPushToken(): string | null {
+    return null;
+  }
+
+  /**
+   * Retrieves or generates a persistent device UUID stored in secure storage.
+   */
+  public async getDeviceId(): Promise<string> {
+    if (this.deviceId) return this.deviceId;
+
+    try {
+      let storedId = await secureStorage.getItem('chatlock_device_uuid');
+      if (!storedId) {
+        const rand =
+          Math.random().toString(36).substring(2, 10) +
+          Math.random().toString(36).substring(2, 10);
+        storedId = `dev_web_${Date.now().toString(36)}_${rand}`;
+        await secureStorage.setItem('chatlock_device_uuid', storedId);
+      }
+      this.deviceId = storedId;
+      return storedId;
+    } catch {
+      return 'dev_web_fallback';
+    }
+  }
+
+  /**
+   * Synchronizes browser tab badge via W3C Badging API if supported.
+   */
+  public async syncBadgeCount(count: number): Promise<void> {
+    try {
+      const safeCount = Math.max(0, Math.floor(count));
+      const globalScope =
+        typeof globalThis !== 'undefined' ? (globalThis as Record<string, unknown>) : {};
+      const nav = globalScope['navigator'] as
+        | { setAppBadge?: (count: number) => Promise<void>; clearAppBadge?: () => Promise<void> }
+        | undefined;
+
+      if (nav && typeof nav.setAppBadge === 'function') {
+        if (safeCount > 0) {
+          await nav.setAppBadge(safeCount);
+        } else if (typeof nav.clearAppBadge === 'function') {
+          await nav.clearAppBadge();
+        }
+      }
+    } catch {
+      // Badging API not supported or restricted in this environment
+    }
+  }
+
+  /**
+   * Clears the browser tab badge.
+   */
+  public async clearBadge(): Promise<void> {
+    await this.syncBadgeCount(0);
+  }
+
+  /**
+   * Web push token registration no-op.
+   */
+  public async registerForPushNotifications(): Promise<string | null> {
+    return null;
+  }
+
+  /**
+   * Web push token deactivation no-op.
+   */
+  public async deactivatePushToken(): Promise<void> {
+    // Safe no-op on web
   }
 
   public async initialize(): Promise<void> {
