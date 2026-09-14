@@ -6,6 +6,8 @@ import type {
   SocketData,
 } from '@chatlock/shared-types';
 import { verifyAccessToken } from '../../utils/token.js';
+import { userRepository } from '../../repositories/user.repository.js';
+import { isMongoReady } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
 
 const socketLogger = logger.child('SocketAuth');
@@ -45,6 +47,18 @@ export async function socketAuthMiddleware(
         socketId: socket.id,
       });
       return next(new Error('Invalid token claims'));
+    }
+
+    // Verify account status from DB if MongoDB is connected: reject suspended or banned accounts
+    if (isMongoReady()) {
+      const user = await userRepository.findById(payload.sub);
+      if (user && (user.accountStatus === 'SUSPENDED' || user.accountStatus === 'BANNED')) {
+        socketLogger.warn('Socket connection rejected: User account suspended or banned', {
+          socketId: socket.id,
+          userId: payload.sub,
+        });
+        return next(new Error('User account is suspended or banned'));
+      }
     }
 
     const deviceId = socket.handshake.auth?.deviceId as string | undefined;

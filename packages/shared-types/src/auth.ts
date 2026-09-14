@@ -1,5 +1,5 @@
 import type { ID } from './common.js';
-import type { UserProfile } from './user.js';
+import type { UserProfile, UserRole } from './user.js';
 
 export interface AuthTokens {
   accessToken: string;
@@ -12,6 +12,7 @@ export interface JwtPayload {
   sub: ID;
   email: string;
   username: string;
+  role?: UserRole;
   iat?: number;
   exp?: number;
 }

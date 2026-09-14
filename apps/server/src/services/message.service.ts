@@ -74,7 +74,11 @@ export class MessageService {
     } else if (typeof this.conversationRepo.findById === 'function') {
       try {
         const fetchedConv = await this.conversationRepo.findById(cleanConvId);
-        if (fetchedConv && Array.isArray(fetchedConv.participants) && fetchedConv.participants.length > 0) {
+        if (
+          fetchedConv &&
+          Array.isArray(fetchedConv.participants) &&
+          fetchedConv.participants.length > 0
+        ) {
           participantIds = fetchedConv.participants.map(
             (p: unknown) =>
               (p as { _id?: Types.ObjectId; id?: string })?._id?.toString() ||

@@ -162,7 +162,11 @@ describe('PushNotificationService & DeviceController Unit Tests', () => {
           platform: 'android',
           deviceId: 'my_android_phone',
         },
-      } as unknown as Request<unknown, unknown, { pushToken: string; deviceId?: string; platform?: 'android' }>;
+      } as unknown as Request<
+        unknown,
+        unknown,
+        { pushToken: string; deviceId?: string; platform?: 'android' }
+      >;
 
       const statusMock = vi.fn().mockReturnThis();
       const jsonMock = vi.fn();
@@ -208,7 +212,9 @@ describe('PushNotificationService & DeviceController Unit Tests', () => {
       await controller.deactivatePushToken(req, res);
 
       expect(mockDeviceRepo.deactivateDevice).toHaveBeenCalledWith('user_123', 'my_android_phone');
-      expect(mockDeviceRepo.deactivatePushTokens).toHaveBeenCalledWith(['ExponentPushToken[valid_token_xyz]']);
+      expect(mockDeviceRepo.deactivatePushTokens).toHaveBeenCalledWith([
+        'ExponentPushToken[valid_token_xyz]',
+      ]);
       expect(statusMock).toHaveBeenCalledWith(200);
       expect(jsonMock).toHaveBeenCalledWith(
         expect.objectContaining({

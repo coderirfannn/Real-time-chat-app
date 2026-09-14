@@ -7,3 +7,4 @@ export * from './receipt.js';
 export * from './device.js';
 export * from './socket.js';
 export * from './api.js';
+export * from './admin.js';

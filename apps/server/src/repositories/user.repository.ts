@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
-import { BaseRepository } from './base.repository.js';
+import { BaseRepository, type PaginatedResult } from './base.repository.js';
 import { UserModel, type IUserDoc } from '../models/user.model.js';
-import type { UserStatus } from '@chatlock/shared-types';
+import type { UserStatus, UserRole, AccountStatus } from '@chatlock/shared-types';
 
 export class UserRepository extends BaseRepository<IUserDoc> {
   constructor() {
@@ -64,6 +64,46 @@ export class UserRepository extends BaseRepository<IUserDoc> {
     return this.updateById(userId, {
       lastSeenAt: new Date(),
     });
+  }
+
+  public async findPaginatedUsers(options: {
+    page: number;
+    limit: number;
+    query?: string;
+    role?: UserRole;
+    accountStatus?: AccountStatus;
+  }): Promise<PaginatedResult<IUserDoc>> {
+    const filter: Record<string, unknown> = {};
+
+    if (options.role) {
+      filter['role'] = options.role;
+    }
+    if (options.accountStatus) {
+      filter['accountStatus'] = options.accountStatus;
+    }
+    if (options.query && options.query.trim()) {
+      const clean = options.query.trim();
+      const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escaped, 'i');
+      filter['$or'] = [{ username: regex }, { displayName: regex }, { email: regex }];
+    }
+
+    return this.paginate(filter, {
+      page: options.page,
+      limit: options.limit,
+      sort: { createdAt: -1 },
+    });
+  }
+
+  public async updateAccountStatus(
+    userId: string,
+    accountStatus: AccountStatus,
+  ): Promise<IUserDoc | null> {
+    return this.updateById(userId, { accountStatus });
+  }
+
+  public async updateRole(userId: string, role: UserRole): Promise<IUserDoc | null> {
+    return this.updateById(userId, { role });
   }
 }
 

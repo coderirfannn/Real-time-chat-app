@@ -34,6 +34,7 @@ export function signAccessToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): {
       sub: payload.sub,
       email: payload.email,
       username: payload.username,
+      role: payload.role,
     },
     secret,
     {

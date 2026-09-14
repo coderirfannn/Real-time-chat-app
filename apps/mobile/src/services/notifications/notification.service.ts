@@ -87,8 +87,7 @@ export class NotificationService {
       let storedId = await secureStorage.getItem('chatlock_device_uuid');
       if (!storedId) {
         const rand =
-          Math.random().toString(36).substring(2, 10) +
-          Math.random().toString(36).substring(2, 10);
+          Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
         storedId = `dev_${Platform.OS}_${Date.now().toString(36)}_${rand}`;
         await secureStorage.setItem('chatlock_device_uuid', storedId);
       }
@@ -195,13 +194,14 @@ export class NotificationService {
         Constants.easConfig?.projectId ??
         'd0d37a73-72a4-4fcb-902a-e3ded337236f';
 
-      const tokenData = typeof Notifications.getExpoPushTokenAsync === 'function'
-        ? await Promise.resolve(
-            Notifications.getExpoPushTokenAsync({
-              projectId,
-            }),
-          ).catch(() => null)
-        : null;
+      const tokenData =
+        typeof Notifications.getExpoPushTokenAsync === 'function'
+          ? await Promise.resolve(
+              Notifications.getExpoPushTokenAsync({
+                projectId,
+              }),
+            ).catch(() => null)
+          : null;
 
       const token = tokenData?.data || null;
       this.pushToken = token;

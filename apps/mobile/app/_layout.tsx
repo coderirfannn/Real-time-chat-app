@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -63,6 +63,12 @@ function AuthLifecycleManager({ children }: { children: React.ReactNode }) {
 
     if (segments[0] === 'download') return;
 
+    // Strict boundary: Native mobile platform must NEVER enter admin routes
+    if (Platform.OS !== 'web' && segments[0] === 'admin') {
+      router.replace('/(main)' as never);
+      return;
+    }
+
     const inAuthGroup = segments[0] === '(auth)';
 
     if (!isAuthenticated && !inAuthGroup) {
@@ -124,6 +130,7 @@ export default function RootLayout() {
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="(main)" options={{ headerShown: false }} />
             <Stack.Screen name="download" options={{ headerShown: false }} />
+            <Stack.Screen name="admin" options={{ headerShown: false }} />
           </Stack>
         </AuthLifecycleManager>
       </QueryClientProvider>

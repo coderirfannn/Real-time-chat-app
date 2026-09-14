@@ -1,11 +1,14 @@
 import type { Request, Response, NextFunction } from 'express';
+import type { UserRole } from '@chatlock/shared-types';
 import { UnauthorizedError } from '../errors/app-error.js';
 import { verifyAccessToken } from '../utils/token.js';
+import type { IUserDoc } from '../models/user.model.js';
 
 export interface AuthUserContext {
   id: string;
   email: string;
   username: string;
+  role?: UserRole;
 }
 
 declare global {
@@ -13,6 +16,7 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthUserContext;
+      adminUser?: IUserDoc;
     }
   }
 }
@@ -39,6 +43,7 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
     id: payload.sub,
     email: payload.email,
     username: payload.username,
+    role: payload.role,
   };
 
   next();
@@ -60,6 +65,7 @@ export function optionalAuth(req: Request, _res: Response, next: NextFunction): 
           id: payload.sub,
           email: payload.email,
           username: payload.username,
+          role: payload.role,
         };
       } catch {
         // Ignore errors in optional auth

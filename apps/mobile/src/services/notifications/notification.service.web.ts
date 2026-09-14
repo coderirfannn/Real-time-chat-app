@@ -65,8 +65,7 @@ export class WebNotificationService {
       let storedId = await secureStorage.getItem('chatlock_device_uuid');
       if (!storedId) {
         const rand =
-          Math.random().toString(36).substring(2, 10) +
-          Math.random().toString(36).substring(2, 10);
+          Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
         storedId = `dev_web_${Date.now().toString(36)}_${rand}`;
         await secureStorage.setItem('chatlock_device_uuid', storedId);
       }

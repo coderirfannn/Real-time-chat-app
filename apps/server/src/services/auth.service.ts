@@ -15,6 +15,7 @@ import {
 import {
   ConflictError,
   UnauthorizedError,
+  ForbiddenError,
   NotFoundError,
   BadRequestError,
   RateLimitExceededError,
@@ -65,13 +66,15 @@ export class AuthService {
     // 3. Hash password
     const passwordHash = await hashPassword(input.password);
 
-    // 4. Create user record
+    // 4. Create user record - strictly default to USER role and ACTIVE status
     const user = await this.userRepo.create({
       email: cleanEmail,
       username: cleanUsername,
       displayName: input.displayName.trim(),
       passwordHash,
       status: 'online',
+      role: 'USER',
+      accountStatus: 'ACTIVE',
       lastSeenAt: new Date(),
     });
 
@@ -105,6 +108,7 @@ export class AuthService {
       sub: userId,
       email: user.email,
       username: user.username,
+      role: user.role,
     });
 
     authLogger.info('User registered successfully', { userId, username: cleanUsername });
@@ -169,13 +173,25 @@ export class AuthService {
       throw new UnauthorizedError('Invalid email/username or password');
     }
 
+    // 3. Verify account status
+    if (user.accountStatus === 'SUSPENDED') {
+      authLogger.warn('Suspended user attempted login', { userId: user.id, email: user.email });
+      throw new ForbiddenError('Your account has been suspended. Please contact support.');
+    }
+    if (user.accountStatus === 'BANNED') {
+      authLogger.warn('Banned user attempted login', { userId: user.id, email: user.email });
+      throw new ForbiddenError(
+        'Your account has been permanently banned due to terms of service violations.',
+      );
+    }
+
     // Successful login clears failed attempt tracking
     failedAttemptsMap.delete(identifier);
 
     const userId = user._id.toString();
     const deviceId = input.deviceId || 'default-device';
 
-    // 3. Register device if provided
+    // 4. Register device if provided
     if (input.deviceId && input.platform && input.appVersion) {
       await this.deviceRepo.upsertDevice({
         userId,
@@ -185,10 +201,10 @@ export class AuthService {
       });
     }
 
-    // 4. Update online status
+    // 5. Update online status
     await this.userRepo.updateStatus(userId, 'online');
 
-    // 5. Generate refresh token & session
+    // 6. Generate refresh token & session
     const rawRefreshToken = generateRefreshToken();
     const tokenHash = hashToken(rawRefreshToken);
     const refreshExpiresAt = calculateFutureDate(config.jwt.refreshExpiresIn);
@@ -200,11 +216,12 @@ export class AuthService {
       expiresAt: refreshExpiresAt,
     });
 
-    // 6. Sign access token
+    // 7. Sign access token
     const { token: accessToken, expiresInSeconds } = signAccessToken({
       sub: userId,
       email: user.email,
       username: user.username,
+      role: user.role,
     });
 
     authLogger.info('User logged in successfully', { userId, deviceId });
@@ -261,6 +278,17 @@ export class AuthService {
       throw new UnauthorizedError('User account associated with this session no longer exists');
     }
 
+    if (user.accountStatus === 'SUSPENDED') {
+      authLogger.warn('Suspended user attempted session refresh', { userId: user.id });
+      throw new ForbiddenError('Your account has been suspended. Please contact support.');
+    }
+    if (user.accountStatus === 'BANNED') {
+      authLogger.warn('Banned user attempted session refresh', { userId: user.id });
+      throw new ForbiddenError(
+        'Your account has been permanently banned due to terms of service violations.',
+      );
+    }
+
     const userId = user._id.toString();
 
     // 3. Rotate session: revoke old session
@@ -283,6 +311,7 @@ export class AuthService {
       sub: userId,
       email: user.email,
       username: user.username,
+      role: user.role,
     });
 
     authLogger.debug('Session rotated successfully', { userId, deviceId: session.deviceId });

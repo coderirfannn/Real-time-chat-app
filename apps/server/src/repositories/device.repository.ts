@@ -83,10 +83,7 @@ export class DeviceRepository extends BaseRepository<IDeviceDoc> {
     if (cleanTokens.length === 0) return 0;
 
     const result = await this.model
-      .updateMany(
-        { pushToken: { $in: cleanTokens } },
-        { $set: { isActive: false } },
-      )
+      .updateMany({ pushToken: { $in: cleanTokens } }, { $set: { isActive: false } })
       .exec();
 
     return result.modifiedCount;

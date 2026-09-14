@@ -1,5 +1,5 @@
 import mongoose, { Schema, type Document, type Model } from 'mongoose';
-import type { UserStatus } from '@chatlock/shared-types';
+import type { UserStatus, UserRole, AccountStatus } from '@chatlock/shared-types';
 
 export interface IUserDoc extends Document {
   email: string;
@@ -9,6 +9,8 @@ export interface IUserDoc extends Document {
   avatarUrl?: string;
   bio?: string;
   status: UserStatus;
+  role: UserRole;
+  accountStatus: AccountStatus;
   lastSeenAt: Date;
   isEmailVerified: boolean;
   twoFactorEnabled: boolean;
@@ -68,6 +70,20 @@ const userSchema = new Schema<IUserDoc>(
       default: 'offline',
       index: true,
     },
+    role: {
+      type: String,
+      enum: ['USER', 'ADMIN'],
+      default: 'USER',
+      required: true,
+      index: true,
+    },
+    accountStatus: {
+      type: String,
+      enum: ['ACTIVE', 'SUSPENDED', 'BANNED'],
+      default: 'ACTIVE',
+      required: true,
+      index: true,
+    },
     lastSeenAt: {
       type: Date,
       default: Date.now,
@@ -96,6 +112,8 @@ const userSchema = new Schema<IUserDoc>(
     },
   },
 );
+
+userSchema.index({ role: 1, accountStatus: 1 });
 
 export const UserModel: Model<IUserDoc> =
   (mongoose.models['User'] as Model<IUserDoc>) || mongoose.model<IUserDoc>('User', userSchema);

@@ -25,9 +25,12 @@ export function useNotificationListener(): void {
     let subscription: { remove: () => void } | null = null;
     try {
       subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-        const data = response?.notification?.request?.content?.data as { conversationId?: string } | undefined;
+        const data = response?.notification?.request?.content?.data as
+          { conversationId?: string } | undefined;
         if (data?.conversationId) {
-          const targetPath = `/(main)/chat/${data.conversationId}` as unknown as Parameters<typeof router.push>[0];
+          const targetPath = `/(main)/chat/${data.conversationId}` as unknown as Parameters<
+            typeof router.push
+          >[0];
           router.push(targetPath);
         }
       });

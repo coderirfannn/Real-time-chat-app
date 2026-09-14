@@ -548,17 +548,13 @@ export function useChat(conversationId: string): UseChatReturn {
         .then(() => {
           if (isConnected) {
             setIsSending(true);
-            outboxSyncManager
-              .sendMessageWithBackoff(outboxItem)
-              .finally(() => setIsSending(false));
+            outboxSyncManager.sendMessageWithBackoff(outboxItem).finally(() => setIsSending(false));
           }
         })
         .catch(() => {
           if (isConnected) {
             setIsSending(true);
-            outboxSyncManager
-              .sendMessageWithBackoff(outboxItem)
-              .finally(() => setIsSending(false));
+            outboxSyncManager.sendMessageWithBackoff(outboxItem).finally(() => setIsSending(false));
           }
         });
     },

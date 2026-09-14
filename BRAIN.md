@@ -223,8 +223,50 @@ The environment system strictly validates 13 distinct categories in `@chatlock/c
   - **Bi-Directional Native OS Launcher Badge Synchronization**: Created `syncBadgeCount` and `clearBadge` in `NotificationService`, synchronizing live `totalUnreadCount` in `apps/mobile/app/(main)/_layout.tsx` to `Notifications.setBadgeCountAsync`.
   - **0ms Instant Optimistic Messaging**: Implemented immediate local message injection with status `'sending'` in `useChat.ts`, instant query cache mutation, and non-blocking background queue synchronization alongside concurrent database operations in `message.service.ts`.
   - **Standalone Android APK Release**: Published build `03473ff5-e4e1-4f70-9703-be25aee8ce9a` with live direct download link in `/download` web portal.
-- [ ] **Task 26 — End-to-End Encryption (E2EE)**: Pre-key bundles, Signal Protocol / Double Ratchet session management, encrypted payload storage, and cryptographic key rotation.
-- [ ] **Task 27 — Production Observability & Telemetry**: Sentry crash reporting integration, Prometheus metrics exporter, structured audit logging, and automated load testing.
+- [x] **Task 26 — Web-Only Admin Role & Control Center**:
+  - **Strict Architectural Boundary (Web-Only Admin Platform)**:
+    - Admin users have **no admin interface inside the mobile application**.
+    - The React Native mobile app (`apps/mobile/app/(main)`) is strictly user-only (0 admin routes, 0 admin tabs in `BottomTabBar`, 0 admin items in `NavigationRail`, 0 admin buttons). Even accounts with `role: 'ADMIN'` see only the normal messaging interface on mobile.
+    - Native mobile runtimes (`Platform.OS !== 'web'`) navigating to `/admin/*` are immediately redirected to `/(main)` via route guards in `apps/mobile/app/_layout.tsx` and `apps/mobile/app/admin/_layout.tsx`.
+    - The Admin Control Center lives exclusively under `/admin/*` on web browsers with a responsive dark-mode UI (desktop, tablet, and mobile browser viewports).
+    - Unauthenticated visitors are redirected to `/login`; non-admin authenticated users (`role !== 'ADMIN'`) are blocked with a dedicated 403 Access Denied screen.
+  - **Single Source of Truth Server-Side RBAC**:
+    - User schema extended with `role: 'USER' | 'ADMIN'` (default: `'USER'`) and `accountStatus: 'ACTIVE' | 'SUSPENDED' | 'BANNED'` (default: `'ACTIVE'`), indexed via `{ role: 1, accountStatus: 1 }`.
+    - Client-supplied roles and statuses in registration, profile updates, query params, headers, and sockets are strictly ignored.
+    - New registration always defaults to `role: 'USER'` and `accountStatus: 'ACTIVE'`.
+    - Login and token refresh are immediately blocked for `SUSPENDED` and `BANNED` accounts with HTTP 403 Forbidden.
+    - Socket authentication middleware terminates real-time connection if the account status is not `ACTIVE`.
+    - Created `requireAdmin` Express middleware that performs live database verification against MongoDB to enforce admin privileges and active account status on all `/api/v1/admin/*` endpoints.
+  - **Admin API Namespace (`/api/v1/admin/*`)**:
+    - `GET /api/v1/admin/dashboard`: Live database metric aggregation (zero mock data) across users, messages, conversations, sessions, and pending reports.
+    - `GET /api/v1/admin/users`: Paginated user list with full-text search (`q`), role filter (`role`), account status filter (`accountStatus`), and pagination metadata.
+    - `GET /api/v1/admin/users/:id`: Detailed user profile with aggregated metrics (conversations, messages sent, active devices, report counts) and target-specific moderation history.
+    - `PATCH /api/v1/admin/users/:id/suspend`: Account suspension with reason logging, session revocation, and offline status setting.
+    - `PATCH /api/v1/admin/users/:id/unsuspend`: Account unsuspension with reason audit logging.
+    - `PATCH /api/v1/admin/users/:id/ban`: Permanent account ban with session revocation, socket eviction, and audit log.
+    - `PATCH /api/v1/admin/users/:id/unban`: Account unban restoring active status.
+    - `GET /api/v1/admin/audit-logs`: Paginated tamper-evident audit trail with action filtering (`USER_SUSPENDED`, `USER_BANNED`, `USER_VIEWED`, etc.) and metadata masking.
+    - `GET /api/v1/admin/reports`: Paginated queue for user reports (Task 28 foundation).
+    - `GET /api/v1/admin/groups`: Paginated group chat moderation overview (Task 34 foundation).
+    - `GET /api/v1/admin/media`: Paginated media attachment inventory (Task 35 foundation).
+    - `GET /api/v1/admin/settings`: Safe read-only system telemetry and runtime configuration (secrets, keys, and credentials completely isolated).
+  - **Audit Logging & Security Controls**:
+    - Created `AuditLog` MongoDB schema and repository capturing `adminUserId`, `adminUsername`, `action`, `targetId`, `targetType`, `ipAddress`, `userAgent`, `requestId`, and `metadata`.
+    - Prevents self-moderation (administrators cannot suspend or ban their own accounts).
+    - Provided secure CLI provisioning script (`apps/server/src/scripts/provision-admin.ts`) via `pnpm run admin:promote <email|username>` or automated promotion via `ADMIN_BOOTSTRAP_EMAIL` on startup.
+  - **Web Control Center UI (`apps/mobile/app/admin`)**:
+    - `_layout.tsx`: Responsive layout with desktop sidebar, collapsible mobile menu, active tab pills, 403 error boundaries, and native platform redirection.
+    - `dashboard.tsx`: Real-time system pulse, 4 metric overview cards, system health monitor, and live audit feed.
+    - `users/index.tsx`: Paginated user directory with search bar, role chips, status filters, and suspend/ban modal dialogs with reason input.
+    - `users/[id].tsx`: Deep inspection view displaying profile, communication statistics, account status badges, action controls, and complete moderation history.
+    - `reports.tsx`: Reports management queue with status filters (Pending, Resolved, Dismissed).
+    - `groups.tsx`: Group conversations moderation table displaying membership counts, admin counts, and activity timestamps.
+    - `media.tsx`: Media asset registry displaying MIME types, file sizes, sender IDs, and upload timestamps.
+    - `audit-logs.tsx`: Audit logs viewer with action filters, request IDs, IP addresses, and metadata inspection.
+    - `settings.tsx`: Platform settings overview displaying environment runtime, rate limits, feature flags, uptime, and security bounds.
+- [ ] **Task 27 — End-to-End Encryption (E2EE)**: Pre-key bundles, Signal Protocol / Double Ratchet session management, encrypted payload storage, and cryptographic key rotation.
+- [ ] **Task 28 — User Reporting & Abuse Moderation Pipeline**: User-facing report submission, evidence attachment, report resolution workflows, and automated warning notifications.
+- [ ] **Task 29 — Production Observability & Telemetry**: Sentry crash reporting integration, Prometheus metrics exporter, structured audit logging, and automated load testing.
 
 ---
 
@@ -237,12 +279,12 @@ CHATLOCK QUALITY & VERIFICATION MATRIX — 100% PASSING
 TypeScript Monorepo Typecheck:  ✅ 0 errors (all 5 workspace packages)
 Prettier Formatting:            ✅ All files compliant (0 warnings)
 ESLint Strict Linting:          ✅ 0 errors / 0 warnings across all packages
-Server Vitest Test Suite:       ✅ 42 / 42 test files passed (220 / 220 tests)
-Mobile Vitest Test Suite:       ✅ 31 / 31 test files passed (157 / 157 tests)
-Validation Vitest Test Suite:   ✅ 2 / 2 test files passed (7 / 7 tests)
-Shared-Types / Config:          ✅ Passing
-Total Automated Tests:          ✅ 75 test files passed (384 / 384 tests)
-Expo Web Static Bundler:        ✅ 200 OK (1.6 MB bundle, 0 secrets, SPA fallback)
+Server Vitest Test Suite:       ✅ 43 / 43 test files passed (237 / 237 tests)
+Mobile Vitest Test Suite:       ✅ 33 / 33 test files passed (172 / 172 tests)
+Validation Vitest Test Suite:   ✅ 3 / 3 test files passed (23 / 23 tests)
+Shared-Types / Config:          ✅ 2 / 2 test files passed (4 / 4 tests)
+Total Automated Tests:          ✅ 81 test files passed (436 / 436 tests)
+Expo Web Static Bundler:        ✅ 200 OK (1.7 MB bundle, 965 modules, 0 errors)
 Metro Android Bundler (LAN):    ✅ 200 OK (8.7 MB bundle)
 Metro iOS Bundler (LAN):        ✅ 200 OK (7.9 MB bundle)
 Expo Go Manifest (LAN):         ✅ 200 OK (text/plain)
@@ -250,6 +292,8 @@ Backend Express Server:         ✅ 200 OK (/api/v1/health & /health/ready)
 Production Render Backend:      ✅ 200 OK (https://chatlock-server.onrender.com)
 Production Vercel Web App:      ✅ 200 OK (https://chatlock-web.vercel.app)
 Production Download Portal:     ✅ 200 OK (https://chatlock-web.vercel.app/download)
+Admin Control Center:           ✅ Web-Only (/admin/dashboard, guarded by requireAdmin)
+Mobile App Separation:          ✅ Zero admin UI in mobile app; native redirects to /(main)
 EAS Android APK Build (Preview): ✅ FINISHED (ID: 03473ff5-e4e1-4f70-9703-be25aee8ce9a)
 Direct APK Artifact Download:   ✅ https://expo.dev/artifacts/eas/t0ctWlG9G9yhJPHOqn8KBWCQQ9RKyk5jdDJJB_2BmJQ.apk
 MongoDB Atlas Connection:       ✅ Connected & Healthy (cluster: secureapp)
