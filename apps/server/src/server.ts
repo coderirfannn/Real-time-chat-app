@@ -1,7 +1,7 @@
 import http, { type Server } from 'http';
 import { createApp } from './app.js';
 import { config } from './config/index.js';
-import { connectMongo, disconnectMongo } from './database/connection.js';
+import { connectMongo, disconnectMongo, bootstrapDefaultAdmin } from './database/index.js';
 import { connectRedis, disconnectRedis } from './redis/client.js';
 import { initSocketServer, closeSocketIO } from './socket/index.js';
 import { logger } from './utils/logger.js';
@@ -28,6 +28,7 @@ export async function startServer(options: ServerOptions = {}): Promise<RunningS
   if (shouldConnectDb) {
     try {
       await connectMongo();
+      await bootstrapDefaultAdmin();
     } catch (err) {
       serverLogger.error('Failed to establish initial MongoDB connection', err as Error);
       if (config.app.isProduction) {

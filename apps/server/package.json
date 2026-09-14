@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "admin:promote": "tsx src/scripts/provision-admin.ts",
+    "admin:seed": "tsx src/scripts/seed-admin.ts",
     "clean": "rimraf dist tsconfig.tsbuildinfo"
   },
   "dependencies": {
