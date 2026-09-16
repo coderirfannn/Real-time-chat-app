@@ -1,4 +1,5 @@
 import { logger } from '../utils/logger.js';
+import { metricsService } from '../telemetry/index.js';
 
 const connectionLogger = logger.child('ConnectionManager');
 
@@ -40,6 +41,7 @@ export class ConnectionManager {
 
     sockets.add(cleanSocketId);
     this.socketUsers.set(cleanSocketId, cleanUserId);
+    metricsService.incrementSocketConnections();
 
     connectionLogger.debug('Socket registered', {
       userId: cleanUserId,
@@ -73,6 +75,7 @@ export class ConnectionManager {
 
     this.socketUsers.delete(cleanSocketId);
     const sockets = this.userSockets.get(userId);
+    metricsService.decrementSocketConnections();
 
     let isLastConnection = false;
     let remainingSocketsCount = 0;

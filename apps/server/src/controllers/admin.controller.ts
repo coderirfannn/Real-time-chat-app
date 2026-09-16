@@ -18,6 +18,7 @@ import type {
   ResolveReportInput,
 } from '@chatlock/validation';
 import { adminService, type AdminService } from '../services/admin.service.js';
+import type { MetricSnapshot } from '../telemetry/index.js';
 import { UnauthorizedError } from '../errors/app-error.js';
 
 export class AdminController {
@@ -273,6 +274,18 @@ export class AdminController {
     res: Response<ApiResponse<AdminSettingsData>>,
   ): Promise<void> => {
     const data = this.admin.getSystemSettings();
+    res.status(200).json({
+      success: true,
+      data,
+      timestamp: new Date().toISOString(),
+    });
+  };
+
+  public getMetrics = async (
+    _req: Request,
+    res: Response<ApiResponse<MetricSnapshot>>,
+  ): Promise<void> => {
+    const data = this.admin.getMetricsSnapshot();
     res.status(200).json({
       success: true,
       data,

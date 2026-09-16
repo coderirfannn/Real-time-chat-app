@@ -73,7 +73,8 @@ router.get('/groups', asyncHandler(adminController.listGroups));
 // Media Moderation (Task 35 extension point)
 router.get('/media', asyncHandler(adminController.listMedia));
 
-// Platform System Settings
+// Platform System Settings & Telemetry Metrics
 router.get('/settings', asyncHandler(adminController.getSettings));
+router.get('/metrics', asyncHandler(adminController.getMetrics));
 
 export default router;

@@ -6,6 +6,7 @@ import { notFoundMiddleware } from './middleware/not-found.middleware.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { createApiRouter } from './routes/index.js';
 import { config } from './config/index.js';
+import { telemetryMiddleware, metricsService } from './telemetry/index.js';
 import type { ApiResponse } from '@chatlock/shared-types';
 
 export function createApp(): Express {
@@ -19,16 +20,19 @@ export function createApp(): Express {
   // 1. Request ID attribution
   app.use(requestIdMiddleware);
 
-  // 2. HTTP access logging
+  // 2. Telemetry & Metrics collection
+  app.use(telemetryMiddleware);
+
+  // 3. HTTP access logging
   app.use(loggingMiddleware);
 
-  // 3. Security, CORS, and body parsing
+  // 4. Security, CORS, and body parsing
   const securityMiddlewares = createSecurityMiddlewares();
   for (const middleware of securityMiddlewares) {
     app.use(middleware);
   }
 
-  // 4. Root information endpoint
+  // 5. Root information endpoint
   app.get(
     '/',
     (
@@ -48,7 +52,13 @@ export function createApp(): Express {
     },
   );
 
-  // 5. API Routes (/health, /api/v1/*)
+  // 6. Prometheus Metrics Exporter
+  app.get('/metrics', (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+    res.status(200).send(metricsService.getPrometheusMetrics());
+  });
+
+  // 7. API Routes (/health, /api/v1/*)
   app.use(createApiRouter());
 
   // 6. 404 Route Handler

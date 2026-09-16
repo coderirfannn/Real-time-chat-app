@@ -1,155 +1,315 @@
-# ChatLock — Database Domain Models & Architecture
+# ChatLock — Database Domain Models & Schema Architecture
 
-This document details the MongoDB data models, schema definitions, relationships, and indexing strategies implemented in Mongoose for the **ChatLock** platform.
+This document provides the complete specification of the MongoDB data models, Mongoose schemas, subdocument structures, compound indexes, TTL eviction rules, and relational integrity constraints in **ChatLock**.
 
 ---
 
-## 1. Domain Entities & Relationships
+## 1. Domain Entities & ER Diagram
 
 ```
-+----------------+          1:N          +------------------+
-|      User      | <--------------------+ |     Session      |
-+----------------+                       +------------------+
-  |            |
-  | 1:N        | 1:N
-  v            v
-+----------------+          1:N          +------------------+
-|  Conversation  | <--------------------+ |     Message      |
-+----------------+                       +------------------+
-                                           |                |
-                                           | 1:N            | 1:N
-                                           v                v
-                                 +------------------+  +------------------+
-                                 |  MessageReceipt  |  |      Device      |
-                                 +------------------+  +------------------+
++-------------------+            1:N            +-------------------+
+|       User        | <------------------------ |      Session      |
+|  (role, status)   |                           |  (tokenHash, TTL) |
++-------------------+                           +-------------------+
+   |        |        \
+   | 1:N    | 1:N     +-------- 1:N -----------> +-------------------+
+   |        |                                   |     DeviceKey     |
+   |        v                                   | (IK, SPK, OPKs)   |
+   |   +-------------------+                    +-------------------+
+   |   |   Conversation    |                              ^
+   |   | (directKey, msgs) |                              |
+   |   +-------------------+                              |
+   |        |                                             |
+   |        | 1:N                                         |
+   v        v                                             |
++-------------------+            1:N            +-------------------+
+|      Message      | <------------------------ |  MessageReceipt   |
+| (E2EE/plain, rxn) |                           | (sent, deliv, read)|
++-------------------+                           +-------------------+
+   |
+   +-------- 1:N -----------> +-------------------+
+   |                          |      Report       |
+   |                          | (target, status)  |
+   |                          +-------------------+
+   |
+   +-------- 1:N -----------> +-------------------+
+                              |     AuditLog      |
+                              | (admin, action)   |
+                              +-------------------+
 ```
 
 ---
 
-## 2. Schema Specifications
+## 2. Complete Schema Specifications
 
-### 2.1 User (`UserModel`)
+### 2.1 User Model (`users` collection)
+Stores user account credentials, public profile, role-based authorization, and presence state.
 
-Represents registered user identities and profile status.
-
-| Field                     | Type      | Attributes                                             | Description                                             |
-| ------------------------- | --------- | ------------------------------------------------------ | ------------------------------------------------------- |
-| `email`                   | `String`  | Required, Unique, Lowercase, Trim, Indexed             | User login email address                                |
-| `username`                | `String`  | Required, Unique, Lowercase, Trim, Indexed             | Public handle (alphanumeric + `_`)                      |
-| `displayName`             | `String`  | Required, Trim, Max: 50                                | Display name shown in UI                                |
-| `passwordHash`            | `String`  | Required, `select: false`                              | Bcrypt password hash (excluded from queries by default) |
-| `avatarUrl`               | `String`  | Optional, Trim                                         | Profile picture CDN URL                                 |
-| `bio`                     | `String`  | Optional, Trim, Max: 200                               | User biography                                          |
-| `status`                  | `String`  | Enum: `['online', 'offline', 'away', 'busy']`, Indexed | Real-time presence status                               |
-| `lastSeenAt`              | `Date`    | Default: `Date.now`                                    | Last activity timestamp                                 |
-| `isEmailVerified`         | `Boolean` | Default: `false`                                       | Email verification flag                                 |
-| `twoFactorEnabled`        | `Boolean` | Default: `false`                                       | 2FA protection flag                                     |
-| `createdAt` / `updatedAt` | `Date`    | Automatic timestamps                                   | Record creation/update timestamps                       |
-
----
-
-### 2.2 Session (`SessionModel`)
-
-Tracks active authentication sessions and refresh token hashes.
-
-| Field                     | Type       | Attributes                         | Description                             |
-| ------------------------- | ---------- | ---------------------------------- | --------------------------------------- |
-| `userId`                  | `ObjectId` | Required, Ref: `'User'`, Indexed   | Associated user                         |
-| `tokenHash`               | `String`   | Required, Unique, Trim, Indexed    | SHA-256 hash of the refresh token       |
-| `deviceId`                | `String`   | Required, Trim, Indexed            | Hardware / client device identifier     |
-| `expiresAt`               | `Date`     | Required, TTL Index (`expires: 0`) | Automatic document expiration timestamp |
-| `revokedAt`               | `Date`     | Default: `null`                    | Session revocation timestamp            |
-| `createdAt` / `updatedAt` | `Date`     | Automatic timestamps               | Creation & rotation timestamps          |
+```typescript
+interface IUser {
+  _id: Types.ObjectId;
+  email: string;
+  username: string;
+  displayName: string;
+  passwordHash: string; // select: false
+  avatarUrl?: string;
+  bio?: string;
+  role: 'USER' | 'ADMIN';
+  accountStatus: 'ACTIVE' | 'SUSPENDED' | 'BANNED';
+  status: 'online' | 'offline' | 'away' | 'busy';
+  lastSeenAt: Date;
+  isEmailVerified: boolean;
+  twoFactorEnabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+**Indexes**:
+- `{ email: 1 }` (Unique)
+- `{ username: 1 }` (Unique)
+- `{ role: 1, accountStatus: 1 }` (Compound index for admin verification)
+- `{ status: 1 }` (Single field)
 
 ---
 
-### 2.3 Conversation (`ConversationModel`)
+### 2.2 Session Model (`sessions` collection)
+Stores active login sessions and SHA-256 hashed refresh tokens for RFC 6819 rotation.
 
-Represents 1-to-1 direct chats, group chats, and broadcast channels.
-
-| Field           | Type         | Attributes                                                | Description                                                                 |
-| --------------- | ------------ | --------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `type`          | `String`     | Required, Enum: `['direct', 'group', 'channel']`, Indexed | Conversation modality                                                       |
-| `title`         | `String`     | Optional, Trim, Max: 100                                  | Group / channel title                                                       |
-| `avatarUrl`     | `String`     | Optional, Trim                                            | Group avatar                                                                |
-| `creatorId`     | `ObjectId`   | Optional, Ref: `'User'`                                   | Group creator                                                               |
-| `participants`  | `[ObjectId]` | Required, Ref: `'User'`, Indexed                          | Member user IDs                                                             |
-| `admins`        | `[ObjectId]` | Optional, Ref: `'User'`                                   | Group administrator user IDs                                                |
-| `lastMessageId` | `ObjectId`   | Optional, Ref: `'Message'`                                | Pointer to most recent message                                              |
-| `lastMessageAt` | `Date`       | Default: `Date.now`, Indexed (Desc)                       | Timestamp for inbox sorting                                                 |
-| `directKey`     | `String`     | Unique, Sparse, Trim, Indexed                             | Deterministic sorted pair (`userA:userB`) preventing duplicate direct chats |
-| `isArchived`    | `Boolean`    | Default: `false`                                          | Archive status                                                              |
-
----
-
-### 2.4 Message (`MessageModel`)
-
-Independent message documents decoupled from conversation objects.
-
-| Field              | Type           | Attributes                                                              | Description                                 |
-| ------------------ | -------------- | ----------------------------------------------------------------------- | ------------------------------------------- |
-| `conversationId`   | `ObjectId`     | Required, Ref: `'Conversation'`, Indexed                                | Target conversation                         |
-| `senderId`         | `ObjectId`     | Required, Ref: `'User'`, Indexed                                        | Message author                              |
-| `clientMessageId`  | `String`       | Required, Trim, Indexed                                                 | Client UUID for idempotency                 |
-| `type`             | `String`       | Required, Enum: `['text', 'image', 'file', 'audio', 'video', 'system']` | Content type                                |
-| `content`          | `String`       | Required, Trim, Max: 5000                                               | Message payload text                        |
-| `attachments`      | `[Attachment]` | Subdocument array                                                       | Media attachment metadata (URL, mime, size) |
-| `replyToMessageId` | `ObjectId`     | Optional, Ref: `'Message'`                                              | Threading / quote reply reference           |
-| `editedAt`         | `Date`         | Default: `null`                                                         | Edit timestamp                              |
-| `deletedAt`        | `Date`         | Default: `null`                                                         | Soft delete timestamp                       |
+```typescript
+interface ISession {
+  _id: Types.ObjectId;
+  userId: Types.ObjectId;
+  tokenHash: string; // SHA-256 hash of plaintext refresh token
+  deviceId: string;
+  expiresAt: Date; // MongoDB TTL index
+  revokedAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+**Indexes**:
+- `{ tokenHash: 1 }` (Unique)
+- `{ userId: 1 }` (Lookup active user sessions)
+- `{ userId: 1, deviceId: 1 }` (Target session per device)
+- `{ expiresAt: 1 }` with `expireAfterSeconds: 0` (Automatic TTL document cleanup)
 
 ---
 
-### 2.5 MessageReceipt (`MessageReceiptModel`)
+### 2.3 Conversation Model (`conversations` collection)
+Represents 1-to-1 direct chats, group conversations, and broadcast channels.
 
+```typescript
+interface IConversation {
+  _id: Types.ObjectId;
+  type: 'direct' | 'group' | 'channel';
+  title?: string;
+  avatarUrl?: string;
+  creatorId?: Types.ObjectId;
+  participants: Types.ObjectId[];
+  admins?: Types.ObjectId[];
+  lastMessageId?: Types.ObjectId;
+  lastMessage?: {
+    content: string;
+    senderId: Types.ObjectId;
+    createdAt: Date;
+  };
+  lastMessageAt: Date;
+  directKey?: string; // Sorted "userA:userB" for 1-to-1 deduplication
+  isArchived: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+**Indexes**:
+- `{ participants: 1, lastMessageAt: -1 }` (High-performance user inbox sorting)
+- `{ directKey: 1 }` (Unique, Sparse: strictly guarantees 1 conversation per user pair)
+
+---
+
+### 2.4 Message Model (`messages` collection)
+Independent message records supporting both End-to-End Encrypted (E2EE) ciphertext payloads and legacy plaintext bodies, attachments, and emoji reactions.
+
+```typescript
+interface IMessage {
+  _id: Types.ObjectId;
+  conversationId: Types.ObjectId;
+  senderId: Types.ObjectId;
+  senderDeviceId?: string;
+  clientMessageId: string;
+  type: 'text' | 'image' | 'file' | 'audio' | 'video' | 'system';
+  content: string; // Plaintext or ciphertext fallback
+  encryptionState: 'LEGACY_PLAINTEXT' | 'E2EE';
+  e2eePayload?: {
+    ciphertext: string;
+    nonce: string;
+    ratchetKey: string;
+    pn: number;
+    n: number;
+    initHeader?: {
+      version: number;
+      initiatorUserId: string;
+      initiatorDeviceId: string;
+      initiatorEphemeralKey: string;
+      recipientDeviceId: string;
+      signedPreKeyId: number;
+      oneTimePreKeyId?: number;
+    };
+  };
+  attachments?: Array<{
+    id: string;
+    url: string;
+    mimeType: string;
+    sizeBytes: number;
+    fileName?: string;
+    thumbnailUrl?: string;
+    width?: number;
+    height?: number;
+    durationMs?: number;
+  }>;
+  reactions?: Array<{
+    emoji: string;
+    users: Types.ObjectId[];
+    count: number;
+  }>;
+  replyToMessageId?: Types.ObjectId;
+  editedAt?: Date;
+  deletedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+**Indexes**:
+- `{ conversationId: 1, createdAt: -1 }` (Cursor-paginated chat history retrieval)
+- `{ senderId: 1, clientMessageId: 1 }` (Unique compound: client idempotency deduplication)
+
+---
+
+### 2.5 MessageReceipt Model (`messageReceipts` collection)
 Tracks delivery and read state per participant per message.
 
-| Field            | Type       | Attributes                                      | Description                     |
-| ---------------- | ---------- | ----------------------------------------------- | ------------------------------- |
-| `messageId`      | `ObjectId` | Required, Ref: `'Message'`, Indexed             | Target message                  |
-| `conversationId` | `ObjectId` | Required, Ref: `'Conversation'`, Indexed        | Associated conversation         |
-| `userId`         | `ObjectId` | Required, Ref: `'User'`, Indexed                | Recipient user                  |
-| `status`         | `String`   | Required, Enum: `['sent', 'delivered', 'read']` | Delivery stage                  |
-| `deliveredAt`    | `Date`     | Default: `null`                                 | Delivery confirmation timestamp |
-| `readAt`         | `Date`     | Default: `null`                                 | Read confirmation timestamp     |
+```typescript
+interface IMessageReceipt {
+  _id: Types.ObjectId;
+  messageId: Types.ObjectId;
+  conversationId: Types.ObjectId;
+  userId: Types.ObjectId;
+  status: 'sent' | 'delivered' | 'read';
+  deliveredAt?: Date;
+  readAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+**Indexes**:
+- `{ messageId: 1, userId: 1 }` (Unique compound: exactly 1 receipt status per user per message)
+- `{ conversationId: 1, userId: 1, status: 1 }` (Fast unread count calculation)
 
 ---
 
-### 2.6 Device (`DeviceModel`)
+### 2.6 Device & Push Token Model (`devices` collection)
+Maintains registered hardware devices and APNs / FCM push notification tokens.
 
-Tracks active mobile/web devices and push notification tokens.
-
-| Field          | Type       | Attributes                                  | Description                        |
-| -------------- | ---------- | ------------------------------------------- | ---------------------------------- |
-| `userId`       | `ObjectId` | Required, Ref: `'User'`, Indexed            | Device owner                       |
-| `deviceId`     | `String`   | Required, Trim, Indexed                     | Hardware/instance unique ID        |
-| `pushToken`    | `String`   | Optional, Trim, Sparse Indexed              | APNs / FCM push notification token |
-| `platform`     | `String`   | Required, Enum: `['ios', 'android', 'web']` | Operating platform                 |
-| `appVersion`   | `String`   | Required, Trim                              | Client application version         |
-| `lastActiveAt` | `Date`     | Default: `Date.now`                         | Heartbeat timestamp                |
-| `isActive`     | `Boolean`  | Default: `true`, Indexed                    | Active device flag                 |
+```typescript
+interface IDevice {
+  _id: Types.ObjectId;
+  userId: Types.ObjectId;
+  deviceId: string; // Persistent UUID (SecureStore / KeyStore)
+  pushToken?: string;
+  platform: 'ios' | 'android' | 'web';
+  appVersion: string;
+  lastActiveAt: Date;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+**Indexes**:
+- `{ userId: 1, deviceId: 1 }` (Unique compound)
+- `{ pushToken: 1 }` (Sparse index for push token lookup)
+- `{ userId: 1, isActive: 1 }` (Active device broadcast target)
 
 ---
 
-## 3. Database Indexes & Justification
+### 2.7 DeviceKey Model (`deviceKeys` collection)
+Stores public cryptographic material for the Signal Protocol (X3DH) implementation. Private keys are NEVER stored here.
 
-| Collection        | Index Fields                                  | Type               | Query Pattern & Justification                                      |
-| ----------------- | --------------------------------------------- | ------------------ | ------------------------------------------------------------------ |
-| `users`           | `{ email: 1 }`                                | Unique             | Fast user login lookup by email                                    |
-| `users`           | `{ username: 1 }`                             | Unique             | Fast profile lookup and uniqueness check                           |
-| `users`           | `{ status: 1 }`                               | Single field       | Filter active online users                                         |
-| `sessions`        | `{ tokenHash: 1 }`                            | Unique             | Fast refresh token validation                                      |
-| `sessions`        | `{ userId: 1 }`                               | Single field       | Revoke all sessions for a user                                     |
-| `sessions`        | `{ expiresAt: 1 }`                            | TTL (`expires: 0`) | Automated eviction of expired sessions                             |
-| `sessions`        | `{ userId: 1, deviceId: 1 }`                  | Compound           | Target session per device                                          |
-| `conversations`   | `{ participants: 1 }`                         | Multikey           | Find all conversations for a specific user                         |
-| `conversations`   | `{ lastMessageAt: -1 }`                       | Single field       | Sort user inbox by most recent activity                            |
-| `conversations`   | `{ participants: 1, lastMessageAt: -1 }`      | Compound           | Fast indexed retrieval of user inbox sorted by date                |
-| `conversations`   | `{ directKey: 1 }`                            | Unique, Sparse     | Strictly prevents duplicate 1-to-1 conversations between two users |
-| `messages`        | `{ conversationId: 1, createdAt: -1 }`        | Compound           | Fast paginated chat history retrieval                              |
-| `messages`        | `{ senderId: 1, clientMessageId: 1 }`         | Unique Compound    | Idempotent message deduplication per client dispatch               |
-| `messageReceipts` | `{ messageId: 1, userId: 1 }`                 | Unique Compound    | Ensures exactly 1 receipt status per user per message              |
-| `messageReceipts` | `{ conversationId: 1, userId: 1, status: 1 }` | Compound           | High-performance unread count computation                          |
-| `devices`         | `{ userId: 1, deviceId: 1 }`                  | Unique Compound    | Prevents duplicate device records per user                         |
-| `devices`         | `{ pushToken: 1 }`                            | Sparse             | Lookup device by APNs/FCM push token                               |
-| `devices`         | `{ userId: 1, isActive: 1 }`                  | Compound           | Target all active devices of a user for push notifications         |
+```typescript
+interface IDeviceKey {
+  _id: Types.ObjectId;
+  userId: Types.ObjectId;
+  deviceId: string;
+  identityKey: string; // Public Ed25519 hex
+  signedPreKey: {
+    keyId: number;
+    publicKey: string; // Public X25519 hex
+    signature: string; // Ed25519 signature hex
+    createdAt: Date;
+  };
+  oneTimePreKeys: Array<{
+    keyId: number;
+    publicKey: string; // Public X25519 hex
+    consumed: boolean; // Set atomically when claimed
+    consumedAt?: Date;
+  }>;
+  status: 'ACTIVE' | 'REVOKED';
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+**Indexes**:
+- `{ userId: 1, deviceId: 1 }` (Unique compound)
+- `{ userId: 1, status: 1 }` (Lookup active cryptographic devices)
+- `{ 'oneTimePreKeys.consumed': 1 }` (Fast unconsumed OPK retrieval)
+
+---
+
+### 2.8 Abuse Report Model (`reports` collection)
+Captures user moderation reports with zero inspection of encrypted message contents.
+
+```typescript
+interface IReport {
+  _id: Types.ObjectId;
+  reporterId: Types.ObjectId;
+  reportedUserId: Types.ObjectId;
+  targetType: 'USER' | 'MESSAGE' | 'CONVERSATION';
+  targetId: string;
+  reason: 'HARASSMENT' | 'SPAM' | 'HATE_SPEECH' | 'INAPPROPRIATE_CONTENT' | 'IMPERSONATION' | 'OTHER';
+  description?: string;
+  status: 'OPEN' | 'UNDER_REVIEW' | 'RESOLVED' | 'DISMISSED';
+  actionTaken?: 'NONE' | 'WARNED' | 'SUSPENDED' | 'BANNED';
+  resolvedBy?: Types.ObjectId;
+  resolvedAt?: Date;
+  resolutionNotes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+**Indexes**:
+- `{ reporterId: 1, targetType: 1, targetId: 1, status: 1 }` (Compound: prevents duplicate active reports)
+- `{ status: 1, createdAt: -1 }` (Admin moderation queue sorting)
+
+---
+
+### 2.9 AuditLog Model (`auditLogs` collection)
+Provides an immutable, tamper-evident audit trail of all administrative and moderation actions.
+
+```typescript
+interface IAuditLog {
+  _id: Types.ObjectId;
+  adminUserId: Types.ObjectId;
+  adminUsername: string;
+  action: 'USER_SUSPENDED' | 'USER_UNSUSPENDED' | 'USER_BANNED' | 'USER_UNBANNED' | 'USER_WARNED' | 'REPORT_RESOLVED' | 'REPORT_DISMISSED';
+  targetType: 'USER' | 'REPORT' | 'CONVERSATION' | 'SYSTEM';
+  targetId: string;
+  ipAddress?: string;
+  userAgent?: string;
+  requestId?: string;
+  reason?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: Date;
+}
+```
+**Indexes**:
+- `{ adminUserId: 1, createdAt: -1 }`
+- `{ action: 1, createdAt: -1 }`
+- `{ targetId: 1, createdAt: -1 }`

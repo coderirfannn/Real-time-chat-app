@@ -29,6 +29,7 @@ import { ConversationModel } from '../models/conversation.model.js';
 import { MessageModel } from '../models/message.model.js';
 import { BadRequestError, NotFoundError } from '../errors/app-error.js';
 import { evictUserSockets, sendModerationWarning } from '../socket/index.js';
+import { metricsService, type MetricSnapshot } from '../telemetry/index.js';
 import { logger } from '../utils/logger.js';
 
 const adminLogger = logger.child('AdminService');
@@ -1036,6 +1037,13 @@ export class AdminService {
       },
       serverUptime: Math.floor(process.uptime()),
     };
+  }
+
+  /**
+   * Returns live Prometheus metrics snapshot for telemetry and admin dashboards.
+   */
+  public getMetricsSnapshot(): MetricSnapshot {
+    return metricsService.getMetricsSnapshot();
   }
 }
 

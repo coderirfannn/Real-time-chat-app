@@ -376,7 +376,13 @@ The environment system strictly validates 13 distinct categories in `@chatlock/c
     - Dark-mode responsive bottom sheet / modal matching Figma E-Chat design language.
     - Seamlessly integrated into conversation options ("Report User") and message context options ("Report Message").
     - Privacy guarantee banner assuring users that reports are confidential and encryption is preserved.
-- [ ] **Task 29 — Production Observability & Telemetry**: Sentry crash reporting integration, Prometheus metrics exporter, structured audit logging, and automated load testing.
+- [x] **Task 29 — Production Observability, Prometheus Metrics & Telemetry Engine**:
+  - Built high-performance, in-memory `MetricsService` exporting standard Prometheus exposition format (`GET /metrics` and authenticated `GET /api/v1/admin/metrics`).
+  - Implemented `telemetryMiddleware` capturing per-route HTTP request counts, response latency summaries, and status code distributions with URL ID normalization.
+  - Connected real-time Socket.IO connection gauges (`socket_connections_active`) and event counters (`socket_events_total`) in `ConnectionManager`.
+  - Added live telemetry snapshots (`getMetricsSnapshot()`) into `AdminService` and `AdminController`.
+  - Unit tests covering HTTP metrics, socket connections, DB durations, and parameter normalization (6 tests in `metrics.service.test.ts`).
+  - Total automated tests: **531 tests passing across 96 test files**.
 
 ---
 

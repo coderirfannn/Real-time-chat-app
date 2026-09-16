@@ -1,99 +1,142 @@
-# ChatLock — Production Authentication Architecture
+# ChatLock — Authentication, Session Lifecycle & RBAC Architecture
 
-This document details the production-grade authentication and session management architecture implemented for the **ChatLock** platform.
-
----
-
-## 1. Authentication Flow Overview
-
-```
-Client                                     Server                                      MongoDB
-  |                                          |                                            |
-  |--- 1. POST /api/v1/auth/register ------->|                                            |
-  |    (email, username, password)           |--- 2. Hash password (bcrypt) ------------>|
-  |                                          |--- 3. Generate raw refresh token --------->|
-  |                                          |--- 4. Store SHA-256(refresh_token) ------->| [Session]
-  |<-- 5. Return JWT Access + Refresh -------|                                            |
-  |                                          |                                            |
-  |--- 6. GET /api/v1/auth/me -------------->|                                            |
-  |    (Authorization: Bearer <JWT>)         |--- 7. Verify JWT Signature --------------->|
-  |<-- 8. Return 200 OK + UserProfile -------|                                            |
-  |                                          |                                            |
-  |--- 9. POST /api/v1/auth/refresh -------->|                                            |
-  |    (refreshToken)                        |--- 10. Verify & Revoke Old Session ------->| [Session]
-  |                                          |--- 11. Create New Rotated Session ------->| [Session]
-  |<-- 12. Return New Token Pair ------------|                                            |
-```
+This document details the authentication subsystem, session management, OAuth2 RFC 6819 token rotation, Role-Based Access Control (RBAC), and account status enforcement for **ChatLock**.
 
 ---
 
-## 2. Cryptographic Security Standards
+## 1. End-to-End Authentication Lifecycle
 
-### 2.1 Password Hashing
+```
+[ Client ]                                     [ Express Server ]                                 [ MongoDB Atlas ]
+    |                                                  |                                                  |
+    |---- 1. POST /api/v1/auth/register -------------->|                                                  |
+    |     (email, username, displayName, password)     |---- 2. Hash password (bcrypt 12 rounds) -------->|
+    |                                                  |---- 3. Create User record (role: USER) --------->|
+    |                                                  |---- 4. Generate high-entropy Refresh Token ------>|
+    |                                                  |---- 5. Save SHA-256(refreshToken) in Session --->| [sessions]
+    |<--- 6. Return JWT Access Token + Refresh Token --|                                                  |
+    |                                                  |                                                  |
+    |---- 7. Authenticated Request with Bearer JWT --->|                                                  |
+    |     (Authorization: Bearer <accessToken>)        |---- 8. Verify JWT signature & expiration --------|
+    |                                                  |---- 9. req.user = decodedToken ----------------->|
+    |<--- 10. Process Request & Return 200 OK ---------|                                                  |
+    |                                                  |                                                  |
+    |---- 11. POST /api/v1/auth/refresh -------------->|                                                  |
+    |     (refreshToken)                               |---- 12. Hash incoming token & lookup Session --->|
+    |                                                  |         [IF NOT FOUND / PREVIOUSLY REVOKED]:     |
+    |                                                  |         -> TRIGGER TOKEN THEFT REVOCATION!       |
+    |                                                  |         -> Revoke ALL sessions for userId        |
+    |                                                  |         -> Return 401 UNAUTHORIZED               |
+    |                                                  |         [IF FOUND & ACTIVE]:                     |
+    |                                                  |         -> Mark old session revoked              |
+    |                                                  |         -> Create new session with new token     |
+    |<--- 13. Return Rotated Access + Refresh Token ---|                                                  |
+```
 
-- **Algorithm**: `bcrypt` (`bcryptjs`)
-- **Salt Rounds**: Configurable via `BCRYPT_SALT_ROUNDS` (Default: `12`)
-- **Storage**: Stored in `users.passwordHash` with Mongoose `select: false` to ensure password hashes are never returned in queries or serialization.
+---
 
-### 2.2 JWT Access Tokens
+## 2. Token Security Specifications
 
-- **Algorithm**: `HS256`
-- **Secret Key**: `JWT_ACCESS_SECRET` (strictly isolated from client bundles)
-- **Lifespan**: Short-lived (Default: `15m`)
+### 2.1 Access Tokens (JWT)
+- **Signature Algorithm**: HMAC SHA-256 (`HS256`)
+- **Secret Key**: `JWT_ACCESS_SECRET` (Strictly backend-isolated)
+- **Lifespan**: 15 minutes (`JWT_ACCESS_EXPIRES_IN=15m`)
 - **Payload Schema**:
-  ```json
-  {
-    "sub": "<user_object_id>",
-    "email": "user@example.com",
-    "username": "user_handle",
-    "iat": 1740000000,
-    "exp": 1740000900
+  ```typescript
+  interface JwtAccessPayload {
+    sub: string;       // MongoDB User ObjectId
+    email: string;     // User email address
+    username: string;  // User handle
+    role: 'USER' | 'ADMIN';
+    iat: number;       // Issued-at UNIX timestamp
+    exp: number;       // Expiration UNIX timestamp
   }
   ```
 
-### 2.3 Refresh Token Rotation & Session Management
+### 2.2 Refresh Tokens (Rotating SHA-256)
+- **Entropy Generation**: `crypto.randomBytes(40).toString('hex')` (80-character high-entropy hex string)
+- **Persistence Guarantee**: Plaintext refresh tokens are **NEVER** stored in the database. Only `crypto.createHash('sha256').update(rawToken).digest('hex')` is persisted in the `sessions` collection.
+- **Lifespan**: 30 days (`JWT_REFRESH_EXPIRES_IN=30d`), automatically purged via MongoDB TTL index on `expiresAt`.
 
-- **High-Entropy Tokens**: Refresh tokens are 40-byte cryptographically secure random hexadecimal strings (`crypto.randomBytes(40).toString('hex')`).
-- **One-Way Token Hashing**: Raw refresh tokens are never persisted in plaintext. The database only stores `SHA-256(rawRefreshToken)`.
-- **Strict Token Rotation**: Every call to `POST /api/v1/auth/refresh` immediately revokes the current session and provisions a brand-new session with a new refresh token. Replaying an old refresh token is rejected with `401 Unauthorized`.
-- **TTL Eviction**: The `sessions` collection features a MongoDB TTL index on `expiresAt` with `expireAfterSeconds: 0` for zero-overhead background cleanup.
+### 2.3 Token Reuse Detection & Family Revocation (RFC 6819)
+If an attacker intercepts an old refresh token and attempts to exchange it after the legitimate client has already rotated it:
+1. The server detects that the submitted token has already been marked as `revokedAt != null` or does not exist.
+2. The server classifies the event as an **active session hijacking attempt**.
+3. The server immediately executes `SessionRepository.revokeAllForUser(userId)`, invalidating all active refresh sessions across every device the user owns.
+4. The server returns `401 Unauthorized` with error code `TOKEN_REUSED_REVOCATION`.
 
 ---
 
-## 3. Authorization Middleware
+## 3. Role-Based Access Control (RBAC)
 
-### `requireAuth`
+ChatLock enforces server-side Role-Based Access Control anchored directly in the database.
 
-Enforces strict Bearer JWT token verification. Rejects missing, expired, or tampered tokens with `401 UNAUTHORIZED`. Attaches the cryptographically verified user context to `req.user`.
+### 3.1 User Roles
+- **`USER`**: Standard messaging user. Access to direct messaging, conversations, media uploads, profile editing, and user reporting.
+- **`ADMIN`**: Platform administrator. Inherits all `USER` capabilities, plus exclusive access to `/api/v1/admin/*` endpoints and the Web Control Center.
 
-```typescript
-import { requireAuth } from '../middleware/auth.middleware.js';
+### 3.2 Account Status State Machine
 
-router.get('/protected-route', requireAuth, (req, res) => {
-  const currentUserId = req.user.id;
-  // Guaranteed verified identity
-});
+```
+              +---------------------------+
+              |          ACTIVE           | <=================+
+              +---------------------------+                   |
+                |                       |                     |
+     suspendUser()                    banUser()          unsuspendUser() / unbanUser()
+                |                       |                     |
+                v                       v                     |
+       +-----------------+     +-----------------+            |
+       |    SUSPENDED    |     |     BANNED      |            |
+       +-----------------+     +-----------------+            |
+                |                       |                     |
+                +-----------------------+---------------------+
 ```
 
-### `optionalAuth`
+| Account Status | Login / Refresh | Socket Connection | REST API Access | Admin Control Center |
+| :--- | :--- | :--- | :--- | :--- |
+| **`ACTIVE`** | Allowed (200 OK) | Connected | Full access | Allowed (if `role: ADMIN`) |
+| **`SUSPENDED`** | Blocked (`403 FORBIDDEN`) | Terminated & Evicted | Blocked (`403 FORBIDDEN`) | Blocked |
+| **`BANNED`** | Blocked (`403 FORBIDDEN`) | Terminated & Evicted | Blocked (`403 FORBIDDEN`) | Blocked |
 
-Non-blocking token inspection. If a valid Bearer token is provided, `req.user` is populated; otherwise, execution proceeds as anonymous without error.
+### 3.3 Authorization Middleware
+
+#### `requireAuth`
+Extracts and cryptographically verifies the Bearer JWT token from the `Authorization` header. Checks expiration and attaches `req.user` (`{ id, email, username, role }`).
+
+#### `requireAdmin`
+Chained after `requireAuth`. Executes a live database check against `UserModel` to guarantee:
+1. The user exists.
+2. The user's `role` is strictly `'ADMIN'`.
+3. The user's `accountStatus` is strictly `'ACTIVE'`.
+If any check fails, immediately responds with `403 FORBIDDEN` (`ADMIN_PRIVILEGES_REQUIRED`).
+
+```typescript
+// Example: Securing Admin Endpoints
+router.get('/admin/dashboard', requireAuth, requireAdmin, adminController.getDashboardMetrics);
+```
 
 ---
 
-## 4. Rate Limiting & Protection
+## 4. Client-Side Session Hydration & Interceptors
 
-- **Authentication Endpoints**: Protected by `authRateLimiter` allowing a maximum of 20 requests per 15-minute window per IP. Exceeding the threshold returns `429 RATE_LIMIT_EXCEEDED` with `Retry-After` headers.
+The mobile and web clients utilize a centralized `ApiClient` (`apps/mobile/src/services/api/api-client.ts`) configured with transparent token refresh mutex locking:
+
+1. **Automatic Header Injection**: Attaches `Authorization: Bearer <accessToken>` to every outbound HTTP request.
+2. **Transparent 401 Interception**: When an API request returns `401 UNAUTHORIZED`, the client pauses outbound requests and queues pending calls.
+3. **Mutex-Locked Token Exchange**: A single refresh request is dispatched to `/api/v1/auth/refresh`. Upon receiving the new token pair, the `authStore` is updated in `SecureStore` / `localStorage`, and all queued requests are re-executed with the fresh token.
+4. **Clean Logout on Failure**: If the refresh token is expired or revoked, the client cleans up all stored tokens, disconnects the socket, and transitions navigation to `/(auth)/login`.
 
 ---
 
-## 5. API Endpoints Reference
+## 5. Admin Provisioning Tooling
 
-| Method | Path                      | Auth                  | Description                                                                         |
-| ------ | ------------------------- | --------------------- | ----------------------------------------------------------------------------------- |
-| `POST` | `/api/v1/auth/register`   | Public (Rate Limited) | Creates a new user account, active session, and returns access + refresh tokens     |
-| `POST` | `/api/v1/auth/login`      | Public (Rate Limited) | Authenticates credentials by email or username, creates session, and returns tokens |
-| `POST` | `/api/v1/auth/refresh`    | Public                | Rotates refresh token: revokes previous session and returns new token pair          |
-| `POST` | `/api/v1/auth/logout`     | Optional              | Revokes the session associated with the provided refresh token                      |
-| `POST` | `/api/v1/auth/logout-all` | Bearer JWT            | Revokes all active sessions across all devices for the authenticated user           |
-| `GET`  | `/api/v1/auth/me`         | Bearer JWT            | Retrieves the public profile of the authenticated user                              |
+ChatLock provides two safe mechanisms for provisioning administrator accounts:
+
+### CLI Provisioning Command
+Run the admin promotion script directly in the server environment:
+```bash
+pnpm --filter @chatlock/server admin:promote admin@chatlock.com
+```
+
+### Automated Bootstrap Configuration
+Set the `ADMIN_BOOTSTRAP_EMAIL` environment variable in the server `.env`. On startup, if a user with this email exists, the server automatically promotes them to `role: 'ADMIN'`.
