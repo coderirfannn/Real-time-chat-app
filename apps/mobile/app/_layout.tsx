@@ -11,6 +11,8 @@ import { AppLockModal } from '../src/components/security/AppLockModal';
 import { biometricsService } from '../src/services/security/biometrics.service';
 import { useNotificationListener } from '../src/hooks/useNotificationListener';
 
+import { AnimatedSplashScreen } from '../src/components/splash/AnimatedSplashScreen';
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -90,23 +92,7 @@ function AuthLifecycleManager({ children }: { children: React.ReactNode }) {
   return (
     <View style={{ flex: 1, backgroundColor: '#181A20' }}>
       {children}
-      {isLoading && (
-        <View
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: '#181A20',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 9999,
-          }}
-        >
-          <ActivityIndicator size="large" color="#246BFD" />
-        </View>
-      )}
+      <AnimatedSplashScreen isReady={!isLoading} />
       {isAuthenticated && isLocked && (
         <AppLockModal isVisible={isLocked} onUnlocked={() => setIsLocked(false)} />
       )}
