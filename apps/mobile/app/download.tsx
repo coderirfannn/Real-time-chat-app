@@ -18,7 +18,7 @@ export default function DownloadScreen(): React.JSX.Element {
 
   const apkDownloadUrl =
     process.env['EXPO_PUBLIC_APK_DOWNLOAD_URL'] ||
-    'https://expo.dev/artifacts/eas/t0ctWlG9G9yhJPHOqn8KBWCQQ9RKyk5jdDJJB_2BmJQ.apk';
+    'https://expo.dev/accounts/code_with_irfan/projects/chatlock/builds/d11258d5-4891-461a-ad72-db447194bd99';
 
   const playStoreUrl =
     process.env['EXPO_PUBLIC_PLAY_STORE_URL'] ||
