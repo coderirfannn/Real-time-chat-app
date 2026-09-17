@@ -28,12 +28,12 @@ export class AuthApi {
     return apiClient.post<{ success: boolean }>('/auth/change-password', input);
   }
 
-  public async logout(refreshToken: string): Promise<{ message: string }> {
-    return apiClient.post<{ message: string }>('/auth/logout', { refreshToken });
+  public async logout(refreshToken: string): Promise<{ success: boolean }> {
+    return apiClient.post<{ success: boolean }>('/auth/logout', { refreshToken });
   }
 
-  public async logoutAll(): Promise<{ message: string }> {
-    return apiClient.post<{ message: string }>('/auth/logout-all');
+  public async logoutAll(): Promise<{ revokedSessionsCount: number }> {
+    return apiClient.post<{ revokedSessionsCount: number }>('/auth/logout-all');
   }
 }
 

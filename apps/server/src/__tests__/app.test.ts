@@ -29,6 +29,14 @@ describe('Server Application Integration', () => {
     expect(res.body.data.status).toBeDefined();
   });
 
+  it('GET /api/v1/docs responds with 200 OK and structured documentation', async () => {
+    const res = await request(app).get('/api/v1/docs');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.namespaces).toBeInstanceOf(Array);
+    expect(res.body.data.socketEvents).toBeDefined();
+  });
+
   it('GET /non-existent-route responds with 404 and stable error code', async () => {
     const res = await request(app).get('/non-existent-route');
     expect(res.status).toBe(404);

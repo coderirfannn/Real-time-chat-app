@@ -26,26 +26,22 @@ function AuthLifecycleManager({ children }: { children: React.ReactNode }) {
   const segments = useSegments();
   const router = useRouter();
   const [isLocked, setIsLocked] = React.useState(false);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      biometricsService.isAppLockEnabled().then((enabled) => {
-        if (enabled) {
-          setIsLocked(true);
-        }
-      });
-    }
-  }, [isAuthenticated]);
+  const lastBackgroundTimeRef = React.useRef<number | null>(null);
 
   const lifecycleOptions = React.useMemo(
     () => ({
       onResume: async () => {
         if (isAuthenticated) {
-          const enabled = await biometricsService.isAppLockEnabled();
-          if (enabled) {
+          const shouldLock = await biometricsService.shouldLockOnResume(
+            lastBackgroundTimeRef.current,
+          );
+          if (shouldLock) {
             setIsLocked(true);
           }
         }
+      },
+      onBackground: () => {
+        lastBackgroundTimeRef.current = Date.now();
       },
     }),
     [isAuthenticated],

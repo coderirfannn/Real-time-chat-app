@@ -507,63 +507,10 @@ export function useChat(conversationId: string): UseChatReturn {
 
       const targetReplyId = replyToMessageId || replyingTo?.id;
       const rawText = content.trim();
+      const nowIso = new Date().toISOString();
 
       // Immediately cache sender's plaintext locally for 0ms retrieval
       decryptedCacheService.setSync(clientMessageId, rawText);
-
-      // Perform E2EE encryption if direct peer is identified
-      let outboundContent = rawText;
-      let e2eePayload: E2EEEncryptedPayload | undefined;
-      let senderDeviceId: string | undefined;
-      let encryptionState: MessageEncryptionState = 'LEGACY_PLAINTEXT';
-      let isEncrypted = false;
-
-      if (recipient.id && recipient.id !== 'peer' && recipient.id !== currentUserId) {
-        try {
-          const enc = await e2eeMessageService.prepareOutboundMessage({
-            peerUserId: recipient.id,
-            plaintext: rawText,
-            clientMessageId,
-            currentUserId,
-          });
-          outboundContent = enc.ciphertext;
-          e2eePayload = enc.e2eePayload;
-          senderDeviceId = enc.senderDeviceId;
-          encryptionState = 'E2EE';
-          isEncrypted = true;
-        } catch (err) {
-          console.warn('[useChat] Failed to encrypt message, sending as legacy plaintext:', err);
-        }
-      }
-
-      const nowIso = new Date().toISOString();
-      const outboxItem: OutboxMessage = {
-        conversationId,
-        senderId: currentUserId,
-        sender: currentUser ?? undefined,
-        clientMessageId,
-        type: msgType,
-        content: outboundContent,
-        attachments: hasAttachments ? attachments : undefined,
-        replyToMessageId: targetReplyId,
-        status: isConnected ? 'sending' : 'pending',
-        isEncrypted,
-        encryptionState,
-        senderDeviceId,
-        e2eePayload,
-        createdAt: nowIso,
-        updatedAt: nowIso,
-        attempts: 0,
-        retryPayload: {
-          conversationId,
-          content: outboundContent,
-          clientMessageId,
-          replyToMessageId: targetReplyId,
-          encryptionState,
-          senderDeviceId,
-          e2eePayload,
-        },
-      };
 
       const optimisticMsg: LocalMessage = {
         id: clientMessageId,
@@ -576,10 +523,8 @@ export function useChat(conversationId: string): UseChatReturn {
         attachments: hasAttachments ? attachments : undefined,
         replyToMessageId: targetReplyId,
         status: isConnected ? 'sending' : 'pending',
-        isEncrypted,
-        encryptionState,
-        senderDeviceId,
-        e2eePayload,
+        isEncrypted: false,
+        encryptionState: 'LEGACY_PLAINTEXT',
         createdAt: nowIso,
         updatedAt: nowIso,
       };
@@ -617,23 +562,96 @@ export function useChat(conversationId: string): UseChatReturn {
 
       setReplyingTo(null);
 
-      // 3. Persist to outbox queue and dispatch over WebSocket in background without blocking UI
-      outboxService
-        .enqueue(outboxItem)
-        .then(() => {
-          if (isConnected) {
-            setIsSending(true);
-            outboxSyncManager.sendMessageWithBackoff(outboxItem).finally(() => setIsSending(false));
+      // 3. Asynchronously prepare E2EE encryption, persist to durable outbox, and dispatch via WebSocket in background
+      (async () => {
+        let outboundContent = rawText;
+        let e2eePayload: E2EEEncryptedPayload | undefined;
+        let senderDeviceId: string | undefined;
+        let encryptionState: MessageEncryptionState = 'LEGACY_PLAINTEXT';
+        let isEncrypted = false;
+
+        if (recipient.id && recipient.id !== 'peer' && recipient.id !== currentUserId) {
+          try {
+            const enc = await e2eeMessageService.prepareOutboundMessage({
+              peerUserId: recipient.id,
+              plaintext: rawText,
+              clientMessageId,
+              currentUserId,
+            });
+            outboundContent = enc.ciphertext;
+            e2eePayload = enc.e2eePayload;
+            senderDeviceId = enc.senderDeviceId;
+            encryptionState = 'E2EE';
+            isEncrypted = true;
+
+            // Reflect encrypted state on local message item
+            setSocketMessages((prev) =>
+              prev.map((m) =>
+                m.clientMessageId === clientMessageId
+                  ? { ...m, isEncrypted, encryptionState, senderDeviceId, e2eePayload }
+                  : m,
+              ),
+            );
+          } catch (err) {
+            console.warn('[useChat] Failed to encrypt message, sending as legacy plaintext:', err);
           }
-        })
-        .catch(() => {
-          if (isConnected) {
-            setIsSending(true);
-            outboxSyncManager.sendMessageWithBackoff(outboxItem).finally(() => setIsSending(false));
+        }
+
+        const outboxItem: OutboxMessage = {
+          conversationId,
+          senderId: currentUserId,
+          sender: currentUser ?? undefined,
+          clientMessageId,
+          type: msgType,
+          content: outboundContent,
+          attachments: hasAttachments ? attachments : undefined,
+          replyToMessageId: targetReplyId,
+          status: isConnected ? 'sending' : 'pending',
+          isEncrypted,
+          encryptionState,
+          senderDeviceId,
+          e2eePayload,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+          attempts: 0,
+          retryPayload: {
+            conversationId,
+            content: outboundContent,
+            clientMessageId,
+            replyToMessageId: targetReplyId,
+            encryptionState,
+            senderDeviceId,
+            e2eePayload,
+          },
+        };
+
+        try {
+          await outboxService.enqueue(outboxItem);
+        } catch {
+          // Continue to dispatch even if local storage enqueue had minor error
+        }
+
+        if (isConnected) {
+          setIsSending(true);
+          try {
+            await outboxSyncManager.sendMessageWithBackoff(outboxItem);
+          } finally {
+            setIsSending(false);
           }
-        });
+        }
+      })().catch((err) => {
+        console.warn('[useChat] Background send processing failed:', err);
+      });
     },
-    [conversationId, currentUser, currentUserId, isNetworkOnline, replyingTo, queryClient],
+    [
+      conversationId,
+      currentUser,
+      currentUserId,
+      isNetworkOnline,
+      replyingTo,
+      queryClient,
+      recipient.id,
+    ],
   );
 
   const startTyping = useCallback(() => {

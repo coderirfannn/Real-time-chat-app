@@ -8,18 +8,18 @@ Welcome to the **ChatLock** technical documentation hub. ChatLock is a high-conc
 
 | Document | Description |
 | :--- | :--- |
-| [**System Architecture**](file:///docs/architecture.md) | High-level topology, monorepo structure, layered backend design, multi-node cluster scaling, and zero-trust security boundaries. |
-| [**Authentication & RBAC**](file:///docs/authentication.md) | JWT access tokens, SHA-256 refresh token rotation (RFC 6819), session revocation, Role-Based Access Control (`USER` / `ADMIN`), and account state machines. |
-| [**E2EE Cryptographic Architecture**](file:///docs/e2ee-cryptography.md) | Signal Protocol implementation: X3DH key agreement, Double Ratchet, ChaCha20-Poly1305 AEAD, secure hardware key stores, and zero-plaintext server relay. |
-| [**Real-Time Socket.IO Protocol**](file:///docs/realtime-socket-protocol.md) | WebSocket gateway specification, typed event contracts, dual-room broadcasting, ephemeral presence, typing debouncing, and monotonic receipts. |
-| [**Database Domain Models & Schemas**](file:///docs/data-models.md) | Complete MongoDB / Mongoose schema specifications, subdocument definitions, compound indexes, TTL eviction, and consistency rules. |
-| [**REST API Reference**](file:///docs/rest-api-reference.md) | Complete REST API endpoint reference across Auth, Users, Conversations, Messages, Media, E2EE, Devices, Reports, and Admin namespaces. |
-| [**Mobile & Web Client Architecture**](file:///docs/mobile-client-architecture.md) | React Native / Expo Router client design, Zustand state management, 0ms optimistic UI pipeline, offline outbox synchronization, and biometrics. |
-| [**Web Admin Control Center**](file:///docs/admin-control-center.md) | Web-only management portal, live system metrics, user moderation actions (suspend/ban), abuse report resolution, and tamper-evident audit logging. |
-| [**Push Notifications & OS Badges**](file:///docs/push-notifications-and-badges.md) | Expo push notifications, hardware device UUID persistence, privacy-preserving notification payloads, and native OS launcher icon badge synchronization. |
-| [**Media & Cloud Storage Engine**](file:///docs/media-and-storage.md) | Cloudinary cloud integration, signed upload authorization, binary magic byte inspection, CDN caching, and in-app media lightbox. |
-| [**Deployment & Infrastructure**](file:///docs/deployment.md) | Render backend web service, Vercel SPA web hosting, EAS standalone Android APK builds, Docker Compose, and CI/CD quality gates. |
-| [**System Audit & Roadmap Report**](file:///docs/system-audit-and-gap-analysis.md) | In-depth breakdown of fully implemented features, pending architectural enhancements, technical debt analysis, and future roadmap phases. |
+| [**System Architecture**](./architecture.md) | High-level topology, monorepo structure, layered backend design, multi-node cluster scaling, and zero-trust security boundaries. |
+| [**Authentication & RBAC**](./authentication.md) | JWT access tokens, SHA-256 refresh token rotation (RFC 6819), session revocation, Role-Based Access Control (`USER` / `ADMIN`), and account state machines. |
+| [**E2EE Cryptographic Architecture**](./e2ee-cryptography.md) | Signal Protocol implementation: X3DH key agreement, Double Ratchet, ChaCha20-Poly1305 AEAD, secure hardware key stores, and zero-plaintext server relay. |
+| [**Real-Time Socket.IO Protocol**](./realtime-socket-protocol.md) | WebSocket gateway specification, typed event contracts, dual-room broadcasting, ephemeral presence, typing debouncing, and monotonic receipts. |
+| [**Database Domain Models & Schemas**](./data-models.md) | Complete MongoDB / Mongoose schema specifications, subdocument definitions, compound indexes, TTL eviction, and consistency rules. |
+| [**REST API Reference**](./rest-api-reference.md) | Complete REST API endpoint reference across Auth, Users, Conversations, Messages, Media, E2EE, Devices, Reports, and Admin namespaces. |
+| [**Mobile & Web Client Architecture**](./mobile-client-architecture.md) | React Native / Expo Router client design, Zustand state management, 0ms optimistic UI pipeline, offline outbox synchronization, and biometrics. |
+| [**Web Admin Control Center**](./admin-control-center.md) | Web-only management portal, live system metrics, user moderation actions (suspend/ban), abuse report resolution, and tamper-evident audit logging. |
+| [**Push Notifications & OS Badges**](./push-notifications-and-badges.md) | Expo push notifications, hardware device UUID persistence, privacy-preserving notification payloads, and native OS launcher icon badge synchronization. |
+| [**Media & Cloud Storage Engine**](./media-and-storage.md) | Cloudinary cloud integration, signed upload authorization, binary magic byte inspection, CDN caching, and in-app media lightbox. |
+| [**Deployment & Infrastructure**](./deployment.md) | Render backend web service, Vercel SPA web hosting, EAS standalone Android APK builds, Docker Compose, and CI/CD quality gates. |
+| [**System Audit & Roadmap Report**](./system-audit-and-gap-analysis.md) | In-depth breakdown of fully implemented features, pending architectural enhancements, technical debt analysis, and future roadmap phases. |
 
 ---
 

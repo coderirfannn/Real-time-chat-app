@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { apiClient } from '../api/client';
+import { resolveMediaUrl } from '../../utils/media-url';
 import type { MessageAttachment } from '@chatlock/shared-types';
 
 export interface UploadUrlResponse {
@@ -66,8 +67,8 @@ export class MediaUploadService {
     };
 
     if (Platform.OS !== 'web' && file.base64) {
-      // React Native Android/iOS okhttp handles JSON strings reliably without blob bugs
-      bodyData = JSON.stringify({ base64: file.base64 });
+      // React Native Android/iOS handles base64 payload cleanly
+      bodyData = JSON.stringify({ base64: file.base64, mimeType: file.mimeType });
       requestHeaders['Content-Type'] = 'application/json';
     } else if (file.base64 && Platform.OS === 'web') {
       // Decode base64 to binary ArrayBuffer for reliable transfer across Web
@@ -93,7 +94,10 @@ export class MediaUploadService {
       bodyData = await res.blob();
     }
 
-    const uploadResponse = await fetch(uploadUrl, {
+    const separator = uploadUrl.includes('?') ? '&' : '?';
+    const effectiveUploadUrl = `${uploadUrl}${separator}mimeType=${encodeURIComponent(file.mimeType)}`;
+
+    const uploadResponse = await fetch(effectiveUploadUrl, {
       method: 'PUT',
       headers: requestHeaders,
       body: bodyData,
@@ -129,12 +133,14 @@ export class MediaUploadService {
       type: file.mimeType.startsWith('image/') ? 'image' : 'file',
     });
 
-    // 2. Upload binary to storage
-    await this.uploadBinary(descriptor.uploadUrl, file);
+    // 2. Upload binary to resolved storage URL (handles device origin resolution)
+    const targetUploadUrl = resolveMediaUrl(descriptor.uploadUrl);
+    await this.uploadBinary(targetUploadUrl, file);
 
-    // 3. Return completed attachment metadata
+    // 3. Return completed attachment metadata with resolved public CDN URL
     return {
       ...descriptor.attachment,
+      url: descriptor.fileUrl,
       uploadStatus: 'uploaded',
       width: file.width,
       height: file.height,

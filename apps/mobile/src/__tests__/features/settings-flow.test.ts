@@ -60,11 +60,11 @@ describe('Settings & Profile Flow Unit Tests', () => {
 
   it('4. LOGOUT ALL: calls auth logout-all endpoint', async () => {
     vi.spyOn(apiClient, 'post').mockResolvedValue({
-      message: 'All device sessions revoked successfully',
+      revokedSessionsCount: 3,
     } as never);
 
     const res = await authApi.logoutAll();
-    expect(res.message).toBe('All device sessions revoked successfully');
+    expect(res.revokedSessionsCount).toBe(3);
     expect(apiClient.post).toHaveBeenCalledWith('/auth/logout-all');
   });
 });

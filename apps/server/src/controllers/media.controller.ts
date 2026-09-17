@@ -52,21 +52,57 @@ export class MediaController {
 
     const signature = req.query['signature'] as string;
     const expires = Number(req.query['expires']);
-    const declaredMime = req.headers['content-type'] || 'application/octet-stream';
+    const queryMime = (req.query['mimeType'] as string) || '';
 
+    const inferMimeFromKey = (key: string): string => {
+      const ext = key.split('.').pop()?.toLowerCase();
+      switch (ext) {
+        case 'jpg':
+        case 'jpeg':
+          return 'image/jpeg';
+        case 'png':
+          return 'image/png';
+        case 'webp':
+          return 'image/webp';
+        case 'gif':
+          return 'image/gif';
+        case 'mp4':
+          return 'video/mp4';
+        case 'mov':
+          return 'video/quicktime';
+        case 'mp3':
+          return 'audio/mpeg';
+        case 'wav':
+          return 'audio/wav';
+        case 'pdf':
+          return 'application/pdf';
+        case 'zip':
+          return 'application/zip';
+        default:
+          return 'application/octet-stream';
+      }
+    };
+
+    let declaredMime = queryMime;
     let buffer: Buffer;
     const contentType = (req.headers['content-type'] || '').toLowerCase();
 
     if (Buffer.isBuffer(req.body)) {
-      const textHead = req.body.toString('utf-8', 0, 30).trim();
+      const textHead = req.body.toString('utf-8', 0, 50).trim();
       if (
         textHead.startsWith('{') &&
         (contentType.includes('json') || textHead.includes('"base64"'))
       ) {
         try {
-          const parsed = JSON.parse(req.body.toString('utf-8')) as { base64?: string };
+          const parsed = JSON.parse(req.body.toString('utf-8')) as {
+            base64?: string;
+            mimeType?: string;
+          };
           if (parsed && typeof parsed.base64 === 'string') {
             buffer = Buffer.from(parsed.base64, 'base64');
+            if (parsed.mimeType) {
+              declaredMime = parsed.mimeType;
+            }
           } else {
             buffer = req.body;
           }
@@ -85,9 +121,30 @@ export class MediaController {
       typeof req.body === 'object' &&
       typeof (req.body as Record<string, unknown>)['base64'] === 'string'
     ) {
-      buffer = Buffer.from((req.body as { base64: string }).base64, 'base64');
+      const bodyObj = req.body as { base64: string; mimeType?: string };
+      buffer = Buffer.from(bodyObj.base64, 'base64');
+      if (bodyObj.mimeType) {
+        declaredMime = bodyObj.mimeType;
+      }
     } else {
       throw new BadRequestError('Upload body must be raw binary data');
+    }
+
+    if (
+      !declaredMime ||
+      declaredMime === 'application/json' ||
+      declaredMime === 'application/octet-stream'
+    ) {
+      const headerMime = req.headers['content-type'];
+      if (
+        headerMime &&
+        headerMime !== 'application/json' &&
+        headerMime !== 'application/octet-stream'
+      ) {
+        declaredMime = headerMime;
+      } else {
+        declaredMime = inferMimeFromKey(fileKey);
+      }
     }
 
     const result = await this.service.processLocalUpload(

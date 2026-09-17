@@ -3,6 +3,10 @@ import { secureStorage } from '../storage/secure-storage.service';
 import { Platform } from 'react-native';
 
 const APP_LOCK_ENABLED_KEY = 'chatlock_biometric_lock_enabled';
+const APP_LOCK_TIMEOUT_KEY = 'chatlock_biometric_lock_timeout_ms';
+
+// Default grace period before requiring biometric re-authentication (5 minutes)
+export const DEFAULT_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
 
 export interface BiometricCapability {
   hasHardware: boolean;
@@ -63,7 +67,7 @@ export class BiometricsService {
   }
 
   /**
-   * Checks whether the user enabled App Lock in settings.
+   * Checks whether the user enabled App Lock in settings (defaults to false).
    */
   public async isAppLockEnabled(): Promise<boolean> {
     try {
@@ -79,6 +83,49 @@ export class BiometricsService {
    */
   public async setAppLockEnabled(enabled: boolean): Promise<void> {
     await secureStorage.setItem(APP_LOCK_ENABLED_KEY, enabled ? 'true' : 'false');
+  }
+
+  /**
+   * Gets the configured background timeout threshold in milliseconds.
+   */
+  public async getAppLockTimeout(): Promise<number> {
+    try {
+      const val = await secureStorage.getItem(APP_LOCK_TIMEOUT_KEY);
+      if (val) {
+        const parsed = parseInt(val, 10);
+        if (!isNaN(parsed) && parsed >= 0) return parsed;
+      }
+      return DEFAULT_LOCK_TIMEOUT_MS;
+    } catch {
+      return DEFAULT_LOCK_TIMEOUT_MS;
+    }
+  }
+
+  /**
+   * Sets the configured background timeout threshold in milliseconds.
+   */
+  public async setAppLockTimeout(timeoutMs: number): Promise<void> {
+    await secureStorage.setItem(APP_LOCK_TIMEOUT_KEY, String(timeoutMs));
+  }
+
+  /**
+   * Determines if the app should lock on resume based on background duration.
+   * Prevents intrusive prompts when returning from system pickers or brief switches.
+   */
+  public async shouldLockOnResume(lastBackgroundTime: number | null): Promise<boolean> {
+    if (Platform.OS === 'web') return false;
+
+    const enabled = await this.isAppLockEnabled();
+    if (!enabled) return false;
+
+    if (!lastBackgroundTime) {
+      return true;
+    }
+
+    const timeout = await this.getAppLockTimeout();
+    const elapsed = Date.now() - lastBackgroundTime;
+
+    return elapsed >= timeout;
   }
 
   /**

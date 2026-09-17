@@ -103,7 +103,7 @@ describe('Mobile Auth Flow & User Search Integration Tests', () => {
     await useAuthStore.getState().setSession(mockAuthResponse);
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
 
-    vi.spyOn(authApi, 'logout').mockResolvedValue({ message: 'Logged out successfully' });
+    vi.spyOn(authApi, 'logout').mockResolvedValue({ success: true });
     await useAuthStore.getState().logout();
 
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
