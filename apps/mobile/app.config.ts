@@ -22,45 +22,63 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     owner: 'code_with_irfan',
     scheme: 'chatlock',
     version: '0.1.0',
-    orientation: 'portrait',
+    orientation: 'default',
     icon: './assets/icon.png',
-    userInterfaceStyle: 'automatic',
+    userInterfaceStyle: 'dark',
     plugins: [
       'expo-router',
       'expo-secure-store',
       [
         'expo-local-authentication',
         {
-          faceIDPermission: 'Allow ChatLock to use biometric authentication for app lock.',
+          faceIDPermission: 'Allow ChatLock to use biometric authentication for app lock security.',
         },
       ],
       [
         'expo-image-picker',
         {
-          photosPermission: 'Allow ChatLock to access photos to send media attachments.',
-          cameraPermission: 'Allow ChatLock to access camera to take and send photos.',
+          photosPermission: 'Allow ChatLock to access photos and gallery to send media attachments.',
+          cameraPermission: 'Allow ChatLock to access camera to take and send photos securely.',
         },
       ],
       [
         'expo-notifications',
         {
           icon: './assets/icon.png',
-          color: '#2563EB',
+          color: '#246BFD',
         },
       ],
     ],
     ios: {
-      supportsTablet: false,
+      supportsTablet: true,
       bundleIdentifier: bundleId,
+      userInterfaceStyle: 'dark',
+      infoPlist: {
+        NSCameraUsageDescription: 'Allow ChatLock to access camera to take and send encrypted photos.',
+        NSPhotoLibraryUsageDescription: 'Allow ChatLock to access photo library to share media attachments.',
+        NSPhotoLibraryAddUsageDescription: 'Allow ChatLock to save media attachments to your photo library.',
+        NSFaceIDUsageDescription: 'Allow ChatLock to use Face ID for biometric app lock security.',
+        UIRequiresFullScreen: false,
+        UIViewControllerBasedStatusBarAppearance: false,
+      },
     },
     android: {
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
-        backgroundColor: '#0F172A',
+        backgroundColor: '#0E1015',
       },
       package: bundleId,
       versionCode: 1,
-      permissions: ['android.permission.VIBRATE', 'android.permission.POST_NOTIFICATIONS'],
+      allowBackup: false,
+      softwareKeyboardLayoutMode: 'pan',
+      permissions: [
+        'android.permission.INTERNET',
+        'android.permission.ACCESS_NETWORK_STATE',
+        'android.permission.VIBRATE',
+        'android.permission.POST_NOTIFICATIONS',
+        'android.permission.USE_BIOMETRIC',
+        'android.permission.USE_FINGERPRINT',
+      ],
       ...(fs.existsSync(path.resolve(__dirname, 'google-services.json'))
         ? { googleServicesFile: './google-services.json' }
         : process.env.GOOGLE_SERVICES_JSON
