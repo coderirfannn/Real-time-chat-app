@@ -37,7 +37,7 @@ export function useTheme(): Theme {
   const storeTheme = useAppStore((state) => state.theme);
 
   const effectiveMode =
-    storeTheme === 'system' ? (systemScheme === 'dark' ? 'dark' : 'dark') : storeTheme; // Defaulting to dark as ChatLock canonical dark
+    storeTheme === 'system' ? (systemScheme === 'light' ? 'light' : 'dark') : storeTheme;
 
   return getTheme(effectiveMode as 'light' | 'dark');
 }

@@ -12,6 +12,8 @@ import { biometricsService } from '../src/services/security/biometrics.service';
 import { useNotificationListener } from '../src/hooks/useNotificationListener';
 
 import { AnimatedSplashScreen } from '../src/components/splash/AnimatedSplashScreen';
+import { useAppStore } from '../src/store/app.store';
+import { useTheme } from '../src/theme';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,6 +27,8 @@ const queryClient = new QueryClient({
 
 function AuthLifecycleManager({ children }: { children: React.ReactNode }) {
   const { accessToken, isAuthenticated, isLoading, hydrateAuth, user } = useAuthStore();
+  const hydrateAppSettings = useAppStore((state) => state.hydrateAppSettings);
+  const theme = useTheme();
   const segments = useSegments();
   const router = useRouter();
   const [isLocked, setIsLocked] = React.useState(false);
@@ -54,7 +58,8 @@ function AuthLifecycleManager({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     hydrateAuth();
-  }, [hydrateAuth]);
+    hydrateAppSettings();
+  }, [hydrateAuth, hydrateAppSettings]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -90,7 +95,7 @@ function AuthLifecycleManager({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated, accessToken]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#181A20' }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       {children}
       <AnimatedSplashScreen isReady={!isLoading} />
       {isAuthenticated && isLocked && (
@@ -101,15 +106,17 @@ function AuthLifecycleManager({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  const theme = useTheme();
+
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <AuthLifecycleManager>
-          <StatusBar style="light" />
+          <StatusBar style={theme.isDark ? 'light' : 'dark'} />
           <Stack
             screenOptions={{
               headerShown: false,
-              contentStyle: { backgroundColor: '#181A20' },
+              contentStyle: { backgroundColor: theme.colors.background },
             }}
           >
             <Stack.Screen name="index" options={{ headerShown: false }} />

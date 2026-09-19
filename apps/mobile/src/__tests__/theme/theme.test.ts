@@ -74,5 +74,16 @@ describe('Design System Theme & Tokens — Task Phase 1 Verification', () => {
     const lightTheme = getTheme('light');
     expect(lightTheme.isDark).toBe(false);
     expect(lightTheme.colors.background).toBe('#FAFAFA');
+    expect(lightTheme.colors.textPrimary).toBe('#181A20');
+  });
+
+  it('7. CONTRAST & ACCESSIBILITY: light and dark themes have distinct high-contrast surface colors', () => {
+    const dark = getTheme('dark');
+    const light = getTheme('light');
+
+    expect(dark.colors.background).not.toBe(light.colors.background);
+    expect(dark.colors.textPrimary).not.toBe(light.colors.textPrimary);
+    expect(dark.colors.composerBg).toBe('#1F222A');
+    expect(light.colors.composerBg).toBe('#FFFFFF');
   });
 });

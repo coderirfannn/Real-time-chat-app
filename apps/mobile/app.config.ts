@@ -24,7 +24,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     version: '0.1.0',
     orientation: 'default',
     icon: './assets/icon.png',
-    userInterfaceStyle: 'dark',
+    userInterfaceStyle: 'automatic',
     plugins: [
       'expo-router',
       'expo-secure-store',
@@ -52,7 +52,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ios: {
       supportsTablet: true,
       bundleIdentifier: bundleId,
-      userInterfaceStyle: 'dark',
+      userInterfaceStyle: 'automatic',
       infoPlist: {
         NSCameraUsageDescription: 'Allow ChatLock to access camera to take and send encrypted photos.',
         NSPhotoLibraryUsageDescription: 'Allow ChatLock to access photo library to share media attachments.',

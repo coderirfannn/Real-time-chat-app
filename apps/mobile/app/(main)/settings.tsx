@@ -24,6 +24,8 @@ import {
 } from '../../src/services/security/biometrics.service';
 import { useNotificationStore } from '../../src/store/notification.store';
 import { notificationService } from '../../src/services/notifications/notification.service';
+import { useAppStore, type AppTheme } from '../../src/store/app.store';
+import { useTheme } from '../../src/theme';
 
 export default function SettingsScreen(): React.JSX.Element {
   const router = useRouter();
@@ -31,6 +33,11 @@ export default function SettingsScreen(): React.JSX.Element {
   const logout = useAuthStore((state) => state.logout);
   const setUser = useAuthStore((state) => state.setUser);
   const connectionState = useSocketStore((state) => state.connectionState);
+
+  // App Theme State
+  const currentThemeMode = useAppStore((state) => state.theme);
+  const setTheme = useAppStore((state) => state.setTheme);
+  const theme = useTheme();
 
   // Profile editing state
   const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
@@ -101,6 +108,17 @@ export default function SettingsScreen(): React.JSX.Element {
       await setInAppAlertsEnabled(value);
     },
     [setInAppAlertsEnabled],
+  );
+
+  const handleSelectTheme = useCallback(
+    async (mode: AppTheme) => {
+      await setTheme(mode);
+      const label =
+        mode === 'system' ? 'System Default (Auto)' : mode === 'dark' ? 'Dark Mode' : 'Light Mode';
+      setSuccessMessage(`Theme switched to ${label}`);
+      setTimeout(() => setSuccessMessage(null), 2500);
+    },
+    [setTheme],
   );
 
   useEffect(() => {
@@ -366,7 +384,106 @@ export default function SettingsScreen(): React.JSX.Element {
             </View>
           </Card>
 
-          {/* Section 2: Biometric App Lock & Protection */}
+          {/* Section 2: Appearance & Theme Selector */}
+          <Card style={styles.sectionCard} padding="lg">
+            <Text style={styles.sectionHeaderTitle}>Appearance &amp; Theme</Text>
+
+            <View style={styles.settingRow}>
+              <View style={styles.settingIconCol}>
+                <Icon name="sun" size={18} color="#A0A5B5" />
+              </View>
+              <View style={styles.settingTextCol}>
+                <Text style={styles.settingLabel}>Theme Mode</Text>
+                <Text style={styles.settingSubtext}>
+                  {currentThemeMode === 'system'
+                    ? `System Default (Auto ${theme.isDark ? 'Dark' : 'Light'})`
+                    : currentThemeMode === 'dark'
+                      ? 'Dark Mode'
+                      : 'Light Mode'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Segmented Theme Picker */}
+            <View style={styles.themeSegmentContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.themeSegmentBtn,
+                  currentThemeMode === 'system' && styles.themeSegmentBtnActive,
+                ]}
+                onPress={() => handleSelectTheme('system')}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Set theme to system default"
+              >
+                <Icon
+                  name="smartphone"
+                  size={14}
+                  color={currentThemeMode === 'system' ? '#246BFD' : '#A0A5B5'}
+                />
+                <Text
+                  style={[
+                    styles.themeSegmentText,
+                    currentThemeMode === 'system' && styles.themeSegmentTextActive,
+                  ]}
+                >
+                  Auto
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.themeSegmentBtn,
+                  currentThemeMode === 'dark' && styles.themeSegmentBtnActive,
+                ]}
+                onPress={() => handleSelectTheme('dark')}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Set theme to dark mode"
+              >
+                <Icon
+                  name="moon"
+                  size={14}
+                  color={currentThemeMode === 'dark' ? '#246BFD' : '#A0A5B5'}
+                />
+                <Text
+                  style={[
+                    styles.themeSegmentText,
+                    currentThemeMode === 'dark' && styles.themeSegmentTextActive,
+                  ]}
+                >
+                  Dark
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.themeSegmentBtn,
+                  currentThemeMode === 'light' && styles.themeSegmentBtnActive,
+                ]}
+                onPress={() => handleSelectTheme('light')}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Set theme to light mode"
+              >
+                <Icon
+                  name="sun"
+                  size={14}
+                  color={currentThemeMode === 'light' ? '#246BFD' : '#A0A5B5'}
+                />
+                <Text
+                  style={[
+                    styles.themeSegmentText,
+                    currentThemeMode === 'light' && styles.themeSegmentTextActive,
+                  ]}
+                >
+                  Light
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Card>
+
+          {/* Section 3: Biometric App Lock & Protection */}
           <Card style={styles.sectionCard} padding="lg">
             <Text style={styles.sectionHeaderTitle}>App Protection &amp; Privacy</Text>
 
@@ -869,5 +986,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#8AB4F8',
     marginTop: 2,
+  },
+  themeSegmentContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#181A20',
+    borderRadius: 14,
+    padding: 4,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#2A2D36',
+    gap: 4,
+  },
+  themeSegmentBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 6,
+  },
+  themeSegmentBtnActive: {
+    backgroundColor: '#262A34',
+    borderWidth: 1,
+    borderColor: 'rgba(36, 107, 253, 0.4)',
+  },
+  themeSegmentText: {
+    color: '#A0A5B5',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  themeSegmentTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
 });
